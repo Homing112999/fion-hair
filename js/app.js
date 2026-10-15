@@ -1,4 +1,4 @@
-import { SHOP, COLOURS, BASES, FACE_SHAPES } from './data.js';
+import { SHOP, COLOURS, BASES, FACE_SHAPES, TEXTURES, MAINTENANCE, STYLES } from './data.js';
 import { preload, hairMask, recolour, estimateBase, faceShape } from './ai.js';
 
 const $ = (id) => document.getElementById(id);
@@ -140,26 +140,67 @@ $('dye-save').onclick = () => {
   }, 'image/jpeg', 0.9);
 };
 
-// ---------- AI 髮型 ----------
-const shapeChips = $('shape-chips');
-Object.entries(FACE_SHAPES).forEach(([key, s]) => {
-  const b = document.createElement('button');
-  b.className = 'chip';
-  b.dataset.shape = key;
-  b.textContent = s.name;
-  b.onclick = () => showShape(key);
-  shapeChips.append(b);
-});
+// ---------- AI 髮型速配 ----------
+const answers = { faceShape: null, texture: null, maintenance: null };
 
-function showShape(key) {
-  state.shape = key;
-  const s = FACE_SHAPES[key];
-  $('shape-name').textContent = s.name;
-  $('shape-intro').textContent = s.intro;
-  $('shape-styles').innerHTML = s.styles.map((x) => `<li><strong>${x.name}</strong><span>${x.why}</span></li>`).join('');
-  pressed(shapeChips, (b) => b.dataset.shape === key);
-  setBook($('style-book'), `你好 Fion 我係${s.name} 想約剪髮 參考：${s.styles[0].name}`);
+function igLink() {
+  return SHOP.instagram ? `https://www.instagram.com/${SHOP.instagram}/` : null;
+}
+
+function buildOptions(container, items, key) {
+  Object.entries(items).forEach(([value, x]) => {
+    const b = document.createElement('button');
+    b.className = 'option';
+    b.dataset.value = value;
+    b.innerHTML = `<strong>${x.name}</strong><small>${x.desc}</small>`;
+    b.onclick = () => choose(key, value);
+    container.append(b);
+  });
+}
+
+const optFace = $('opt-face'), optTexture = $('opt-texture'), optMaint = $('opt-maint');
+buildOptions(optFace, FACE_SHAPES, 'faceShape');
+buildOptions(optTexture, TEXTURES, 'texture');
+buildOptions(optMaint, MAINTENANCE, 'maintenance');
+
+function choose(key, value) {
+  answers[key] = value;
+  pressed(optFace, (b) => b.dataset.value === answers.faceShape);
+  pressed(optTexture, (b) => b.dataset.value === answers.texture);
+  pressed(optMaint, (b) => b.dataset.value === answers.maintenance);
+  if (answers.faceShape && answers.texture && answers.maintenance) showMatch();
+}
+
+// 配對方法同舊網站一樣：面型 3 分 髮質 2 分 打理習慣 2 分
+function match({ faceShape, texture, maintenance }) {
+  const scored = STYLES.map((d) => {
+    let f = 0;
+    if (d.bestFor.includes(faceShape)) f += 3;
+    if (d.bestTexture.includes(texture)) f += 2;
+    else if (texture === 'wavy' || d.bestTexture.includes('wavy')) f += 1;
+    if (d.maintenance === maintenance) f += 2;
+    else if ((d.maintenance === 'medium' && maintenance !== 'low') || (maintenance === 'medium' && d.maintenance !== 'high')) f += 1;
+    return { style: d, score: f };
+  });
+  scored.sort((x, y) => y.score - x.score);
+  return { primary: scored[0].style, alternatives: scored.slice(1, 3).map((x) => x.style) };
+}
+
+function showMatch() {
+  const { primary, alternatives } = match(answers);
+  const face = FACE_SHAPES[answers.faceShape];
+  $('res-name').textContent = primary.name;
+  $('res-tagline').textContent = primary.tagline;
+  $('res-desc').textContent = primary.description;
+  $('res-reason').textContent = `根據你嘅${face.name}（${face.desc}）、${TEXTURES[answers.texture].name}髮質 同埋${MAINTENANCE[answers.maintenance].name}嘅習慣 呢款最能夾到你嘅比例同生活方式。`;
+  $('res-alts').innerHTML = alternatives.map((x) => `<li><strong>${x.name}</strong> <span>${x.tagline}</span></li>`).join('');
+  setBook($('style-book'), `你好 Fion 我係${face.name} 想約剪「${primary.name}」`);
+  const ig = igLink();
+  $('style-dm').hidden = !ig;
+  if (ig) $('style-dm').href = ig;
+  const wasHidden = $('style-result').hidden;
   $('style-result').hidden = false;
+  if (wasHidden) $('style-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function analyseFace(photo) {
@@ -168,15 +209,14 @@ async function analyseFace(photo) {
     status(st, '⏳ AI 量緊你個面型…');
     const r = await faceShape(photo);
     if (!r) {
-      status(st, '搵唔到塊面 😅 試吓正面望鏡頭再影過 或者答下面 3 條問題。');
+      status(st, '搵唔到塊面 😅 試吓正面望鏡頭再影過 或者喺下面自己揀。');
       return;
     }
-    status(st, '');
-    showShape(r.shape);
-    $('style-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    status(st, `AI 估你係「${FACE_SHAPES[r.shape].name}」 唔啱可以喺下面改。`);
+    choose('faceShape', r.shape);
   } catch (e) {
     console.error(e);
-    status(st, '出咗少少問題 請再試一次或者答下面 3 條問題。');
+    status(st, '出咗少少問題 請再試一次或者喺下面自己揀。');
   }
 }
 
@@ -186,23 +226,21 @@ $('style-file').onchange = async (e) => {
 };
 $('style-reuse').onclick = () => state.photo && analyseFace(state.photo);
 
-$('quiz-form').onsubmit = (e) => {
-  e.preventDefault();
-  const f = new FormData(e.target);
-  const q1 = f.get('q1'), q2 = f.get('q2'), q3 = f.get('q3');
-  if (!q1 || !q2 || !q3) { alert('三條都要答呀'); return; }
-  let key = 'oval';
-  if (q1 === 'long') key = 'long';
-  else if (q3 === 'forehead' && q2 === 'pointed') key = 'heart';
-  else if (q2 === 'square' || q3 === 'jaw') key = 'square';
-  else if (q1 === 'wide' || q2 === 'round') key = 'round';
-  showShape(key);
-};
+// ---------- 熱門髮型 ----------
+$('trend-cards').innerHTML = STYLES.map((x) => {
+  const wa = waLink(`你好 Fion 我想約剪「${x.name}」`);
+  return `<article class="card">
+    <h3>${x.name}</h3>
+    <p class="tagline">${x.tagline}</p>
+    <p>${x.description}</p>
+    ${wa ? `<a class="card-link" href="${wa}" target="_blank" rel="noopener">約 Fion 剪呢款 →</a>` : ''}
+  </article>`;
+}).join('');
 
 // ---------- 預約 / 其他 ----------
 setBook($('book-main'), '你好 Fion 我想預約');
 if (SHOP.instagram) {
-  $('ig-link').href = `https://instagram.com/${SHOP.instagram}`;
+  $('ig-link').href = igLink();
   $('ig-link').hidden = false;
 }
 if (SHOP.address) {

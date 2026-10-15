@@ -4,12 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Fion 髮型工作室 | AI 染髮 · AI 髮型</title>
-  <meta name="description" content="Fion 髮型工作室：影張相即刻試大熱髮色 再用 AI 分析面型揀啱髮型 啱心水先約 Fion 親手打造。">
+  <meta name="description" content="Fion 髮型工作室（太子 Goody Salon）：AI 試大熱髮色 AI 面型速配揀啱髮型 再約 Fion 親身打造。">
   <meta property="og:type" content="website">
   <meta property="og:title" content="Fion 髮型工作室 | AI 染髮 · AI 髮型">
   <meta property="og:description" content="影張相試大熱髮色 AI 分析面型揀髮型 再約 Fion。">
-  <meta property="og:image" content="img/og.jpg">
-  <meta name="theme-color" content="#f6efe7">
+  <meta property="og:image" content="https://homing112999.github.io/fion-hair/img/og.jpg">
+  <meta name="theme-color" content="#faf6f2">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
@@ -21,18 +22,19 @@
     <nav>
       <a href="#dye">AI 染髮</a>
       <a href="#style">AI 髮型</a>
+      <a href="#trends">熱門</a>
       <a href="#book" class="nav-book">預約</a>
     </nav>
   </header>
 
   <main>
     <section class="hero">
-      <p class="eyebrow">AI 試色 · AI 面型分析</p>
-      <h1>影張相<br>先試色 先揀型<br><em>啱心水先約 Fion</em></h1>
-      <p class="lead">揀隻大熱髮色 即刻睇吓染喺你頭上係點。再等 AI 睇吓你係咩面型 推介最襯你嘅髮型。</p>
+      <p class="badge">✨ 太子 Goody Salon · 星級髮型師 Fion</p>
+      <h1>揀啱髮型呢件事<br>交畀 <em>AI</em> 先</h1>
+      <p class="lead">Fion 專注假髮造型、髮型改造同形象指導。而家用兩個 AI 小工具 幫你喺約 Fion 之前摸清方向：一個試大熱髮色 一個搵出最夾你嘅髮型。</p>
       <div class="hero-cta">
         <a class="btn" href="#dye">試 AI 染髮</a>
-        <a class="btn ghost" href="#style">試 AI 髮型</a>
+        <a class="btn ghost" href="#style">試 AI 髮型速配</a>
       </div>
       <p class="privacy">🔒 相片只喺你部手機處理 唔會上傳</p>
     </section>
@@ -80,55 +82,51 @@
     <section id="style" class="tool alt">
       <div class="tool-head">
         <p class="step">02</p>
-        <h2>AI 髮型</h2>
-        <p>AI 量度你個面嘅比例 估你係咩面型 再推介最襯你嘅髮型。</p>
+        <h2>AI 髮型速配</h2>
+        <p>三步搵出最夾你嘅髮型：面型 → 髮質 → 打理習慣。面型可以畀 AI 睇相判斷 或者自己揀。</p>
       </div>
 
+      <h3 class="sub">1. 你嘅面型</h3>
       <div class="stage">
-        <label class="drop" id="style-drop">
+        <label class="drop slim" id="style-drop">
           <input type="file" accept="image/*" id="style-file" hidden>
           <span class="drop-icon">🤳</span>
-          <strong>影相 / 揀相</strong>
+          <strong>畀 AI 睇相判斷面型</strong>
           <small>正面望鏡頭 頭髮撥去後面效果最準</small>
         </label>
         <button class="btn ghost small" id="style-reuse" hidden>用返啱先染髮嗰張相</button>
         <p class="status" id="style-status" hidden></p>
       </div>
+      <p class="hint">或者自己揀：</p>
+      <div class="options" id="opt-face"></div>
 
-      <details class="quiz" id="quiz">
-        <summary>唔想影相？答 3 條問題都得</summary>
-        <form id="quiz-form">
-          <fieldset>
-            <legend>1. 你塊面長定闊？</legend>
-            <label><input type="radio" name="q1" value="long"> 明顯長過闊</label>
-            <label><input type="radio" name="q1" value="even"> 差唔多</label>
-            <label><input type="radio" name="q1" value="wide"> 好似闊過長</label>
-          </fieldset>
-          <fieldset>
-            <legend>2. 你個下巴係？</legend>
-            <label><input type="radio" name="q2" value="pointed"> 尖尖地</label>
-            <label><input type="radio" name="q2" value="round"> 圓圓地</label>
-            <label><input type="radio" name="q2" value="square"> 方方地 腮骨明顯</label>
-          </fieldset>
-          <fieldset>
-            <legend>3. 額頭同腮骨邊個闊啲？</legend>
-            <label><input type="radio" name="q3" value="forehead"> 額頭闊啲</label>
-            <label><input type="radio" name="q3" value="same"> 差唔多</label>
-            <label><input type="radio" name="q3" value="jaw"> 腮骨闊啲</label>
-          </fieldset>
-          <button class="btn small" type="submit">睇結果</button>
-        </form>
-      </details>
+      <h3 class="sub">2. 你嘅髮質</h3>
+      <div class="options" id="opt-texture"></div>
+
+      <h3 class="sub">3. 平時打理頭髮嘅習慣</h3>
+      <div class="options" id="opt-maint"></div>
 
       <div class="result" id="style-result" hidden>
-        <p class="eyebrow">你嘅面型</p>
-        <h3 id="shape-name"></h3>
-        <p id="shape-intro"></p>
-        <ol class="styles" id="shape-styles"></ol>
-        <p class="hint">唔啱？自己揀：</p>
-        <div class="chips" id="shape-chips"></div>
-        <a class="btn small wa" id="style-book" target="_blank" rel="noopener" hidden>搵 Fion 剪呢個型</a>
+        <p class="eyebrow">最夾你嘅方向</p>
+        <h3 id="res-name"></h3>
+        <p class="tagline" id="res-tagline"></p>
+        <p id="res-desc"></p>
+        <p class="reason" id="res-reason"></p>
+        <p class="hint">其他都值得考慮：</p>
+        <ul class="alts" id="res-alts"></ul>
+        <div class="actions">
+          <a class="btn small wa" id="style-book" target="_blank" rel="noopener" hidden>WhatsApp 約 Fion 剪呢款</a>
+          <a class="btn small ghost" id="style-dm" target="_blank" rel="noopener" hidden>DM Fion</a>
+        </div>
+        <p class="fine">結果只係方向建議 最終剪裁方案要 Fion 現場睇你嘅髮量同髮流先確定。</p>
       </div>
+    </section>
+
+    <!-- 熱門髮型 -->
+    <section id="trends" class="trends">
+      <p class="eyebrow">2026 熱門方向</p>
+      <h2>熱門髮型 睇下有冇啱你</h2>
+      <div class="cards" id="trend-cards"></div>
     </section>
 
     <!-- AI 染髮機 -->
@@ -144,10 +142,10 @@
 
     <!-- 預約 -->
     <section id="book" class="book">
-      <h2>揀好色 揀好型？</h2>
-      <p>WhatsApp 約 Fion 親身幫你打造。</p>
+      <h2>摸清方向之後 約 Fion 親身傾</h2>
+      <p>太子 Goody Salon · 假髮造型 / 髮型改造 / 形象指導</p>
       <a class="btn wa" id="book-main" target="_blank" rel="noopener" hidden>WhatsApp 預約</a>
-      <a class="btn ghost" id="ig-link" target="_blank" rel="noopener" hidden>Instagram</a>
+      <a class="btn ghost" id="ig-link" target="_blank" rel="noopener" hidden>DM @fionchan_hair</a>
       <p class="addr" id="addr" hidden></p>
     </section>
   </main>
