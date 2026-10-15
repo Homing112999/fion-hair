@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fion 髮型工作室 | AI 染髮 · AI 髮型</title>
+  <meta name="description" content="Fion 髮型工作室：影張相即刻試大熱髮色 再用 AI 分析面型揀啱髮型 啱心水先約 Fion 親手打造。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Fion 髮型工作室 | AI 染髮 · AI 髮型">
+  <meta property="og:description" content="影張相試大熱髮色 AI 分析面型揀髮型 再約 Fion。">
+  <meta property="og:image" content="img/og.jpg">
+  <meta name="theme-color" content="#f6efe7">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="logo" href="#">Fion<span>髮型工作室</span></a>
+    <nav>
+      <a href="#dye">AI 染髮</a>
+      <a href="#style">AI 髮型</a>
+      <a href="#book" class="nav-book">預約</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="eyebrow">AI 試色 · AI 面型分析</p>
+      <h1>影張相<br>先試色 先揀型<br><em>啱心水先約 Fion</em></h1>
+      <p class="lead">揀隻大熱髮色 即刻睇吓染喺你頭上係點。再等 AI 睇吓你係咩面型 推介最襯你嘅髮型。</p>
+      <div class="hero-cta">
+        <a class="btn" href="#dye">試 AI 染髮</a>
+        <a class="btn ghost" href="#style">試 AI 髮型</a>
+      </div>
+      <p class="privacy">🔒 相片只喺你部手機處理 唔會上傳</p>
+    </section>
+
+    <!-- AI 染髮 -->
+    <section id="dye" class="tool">
+      <div class="tool-head">
+        <p class="step">01</p>
+        <h2>AI 染髮</h2>
+        <p>上載一張見到頭髮嘅相 揀色 揀你而家嘅底色 即刻出效果圖。</p>
+      </div>
+
+      <div class="stage" id="dye-stage">
+        <label class="drop" id="dye-drop">
+          <input type="file" accept="image/*" id="dye-file" hidden>
+          <span class="drop-icon">📷</span>
+          <strong>影相 / 揀相</strong>
+          <small>正面 光線充足 頭髮唔好遮住</small>
+        </label>
+        <div class="compare" id="dye-compare" hidden>
+          <canvas id="dye-before"></canvas>
+          <div class="after-wrap" id="dye-after-wrap"><canvas id="dye-after"></canvas></div>
+          <input type="range" min="0" max="100" value="50" id="dye-slider" aria-label="前後對比">
+          <span class="tag tag-l">染前</span><span class="tag tag-r">染後</span>
+        </div>
+        <p class="status" id="dye-status" hidden></p>
+      </div>
+
+      <h3 class="sub">揀髮色</h3>
+      <div class="swatches" id="swatches"></div>
+      <p class="colour-note" id="colour-note"></p>
+
+      <h3 class="sub">你而家嘅底色</h3>
+      <div class="chips" id="bases"></div>
+      <p class="hint" id="base-hint">上載相之後 AI 會幫你估 你亦可以自己改。</p>
+
+      <div class="actions">
+        <button class="btn ghost small" id="dye-change" hidden>換相</button>
+        <button class="btn ghost small" id="dye-save" hidden>儲存效果圖</button>
+        <a class="btn small wa" id="dye-book" target="_blank" rel="noopener" hidden>用呢隻色預約</a>
+      </div>
+    </section>
+
+    <!-- AI 髮型 -->
+    <section id="style" class="tool alt">
+      <div class="tool-head">
+        <p class="step">02</p>
+        <h2>AI 髮型</h2>
+        <p>AI 量度你個面嘅比例 估你係咩面型 再推介最襯你嘅髮型。</p>
+      </div>
+
+      <div class="stage">
+        <label class="drop" id="style-drop">
+          <input type="file" accept="image/*" id="style-file" hidden>
+          <span class="drop-icon">🤳</span>
+          <strong>影相 / 揀相</strong>
+          <small>正面望鏡頭 頭髮撥去後面效果最準</small>
+        </label>
+        <button class="btn ghost small" id="style-reuse" hidden>用返啱先染髮嗰張相</button>
+        <p class="status" id="style-status" hidden></p>
+      </div>
+
+      <details class="quiz" id="quiz">
+        <summary>唔想影相？答 3 條問題都得</summary>
+        <form id="quiz-form">
+          <fieldset>
+            <legend>1. 你塊面長定闊？</legend>
+            <label><input type="radio" name="q1" value="long"> 明顯長過闊</label>
+            <label><input type="radio" name="q1" value="even"> 差唔多</label>
+            <label><input type="radio" name="q1" value="wide"> 好似闊過長</label>
+          </fieldset>
+          <fieldset>
+            <legend>2. 你個下巴係？</legend>
+            <label><input type="radio" name="q2" value="pointed"> 尖尖地</label>
+            <label><input type="radio" name="q2" value="round"> 圓圓地</label>
+            <label><input type="radio" name="q2" value="square"> 方方地 腮骨明顯</label>
+          </fieldset>
+          <fieldset>
+            <legend>3. 額頭同腮骨邊個闊啲？</legend>
+            <label><input type="radio" name="q3" value="forehead"> 額頭闊啲</label>
+            <label><input type="radio" name="q3" value="same"> 差唔多</label>
+            <label><input type="radio" name="q3" value="jaw"> 腮骨闊啲</label>
+          </fieldset>
+          <button class="btn small" type="submit">睇結果</button>
+        </form>
+      </details>
+
+      <div class="result" id="style-result" hidden>
+        <p class="eyebrow">你嘅面型</p>
+        <h3 id="shape-name"></h3>
+        <p id="shape-intro"></p>
+        <ol class="styles" id="shape-styles"></ol>
+        <p class="hint">唔啱？自己揀：</p>
+        <div class="chips" id="shape-chips"></div>
+        <a class="btn small wa" id="style-book" target="_blank" rel="noopener" hidden>搵 Fion 剪呢個型</a>
+      </div>
+    </section>
+
+    <!-- AI 染髮機 -->
+    <section class="machine">
+      <p class="eyebrow">全新引入</p>
+      <h2>AI 智能染髮機</h2>
+      <ul class="feats">
+        <li><strong>按你底色計配方</strong><span>揀好目標色 部機按你髮色深淺同長度自動計份量</span></li>
+        <li><strong>精準出色</strong><span>自動調配 每次份量一樣 顏色更穩定</span></li>
+        <li><strong>記低你嘅配方</strong><span>下次補色直接用返 唔使由頭試</span></li>
+      </ul>
+    </section>
+
+    <!-- 預約 -->
+    <section id="book" class="book">
+      <h2>揀好色 揀好型？</h2>
+      <p>WhatsApp 約 Fion 親身幫你打造。</p>
+      <a class="btn wa" id="book-main" target="_blank" rel="noopener" hidden>WhatsApp 預約</a>
+      <a class="btn ghost" id="ig-link" target="_blank" rel="noopener" hidden>Instagram</a>
+      <p class="addr" id="addr" hidden></p>
+    </section>
+  </main>
+
+  <footer>
+    <p>© <span id="year"></span> Fion 髮型工作室</p>
+    <p class="fine">效果圖由 AI 模擬 實際效果視乎髮質同底色 以現場為準。</p>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
