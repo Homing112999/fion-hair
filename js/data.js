@@ -2,8 +2,8 @@
 
 export const SHOP = {
   name: 'Fion 髮型工作室',
-  whatsapp: '', // 例如 '85291234567'（未有就留空，預約掣會隱藏）
-  instagram: '', // 例如 'fion.hair'
+  whatsapp: '85262022438', // 香港號碼要加 852（留空預約掣會隱藏）
+  instagram: 'fionchan_hair',
   address: '',
 };
 
