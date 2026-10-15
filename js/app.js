@@ -79,6 +79,7 @@ function renderDye() {
   pressed(swatches, (b) => b.dataset.id === state.colour.id);
   pressed(bases, (b) => Number(b.dataset.level) === state.base);
   colourNote();
+  $('gen-colour-name').textContent = state.colour.name;
   setBook($('dye-book'), `你好 Fion 我想約染髮 想試「${state.colour.name}」（底色大約${state.base}度）`);
   if (!state.mask) return;
   // 底色唔夠淺嘅話 顏色會淡啲 似返現實
@@ -116,6 +117,7 @@ async function onDyeFile(file) {
     $('dye-change').hidden = false;
     $('dye-save').hidden = !state.mask;
     $('style-reuse').hidden = false;
+    if (!gen.photo) $('gen-reuse').hidden = false;
     renderDye();
   } catch (e) {
     console.error(e);
@@ -198,6 +200,7 @@ function showMatch() {
   const ig = igLink();
   $('style-dm').hidden = !ig;
   if (ig) $('style-dm').href = ig;
+  $('style-ai').onclick = (e) => { e.preventDefault(); openPreview(primary.id); };
   const wasHidden = $('style-result').hidden;
   $('style-result').hidden = false;
   if (wasHidden) $('style-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -226,6 +229,90 @@ $('style-file').onchange = async (e) => {
 };
 $('style-reuse').onclick = () => state.photo && analyseFace(state.photo);
 
+// ---------- AI 換髮型效果圖 ----------
+const gen = { photo: null, styleId: null };
+
+function setGenPhoto(photo) {
+  gen.photo = photo;
+  const c = $('gen-src');
+  c.width = photo.width; c.height = photo.height;
+  c.getContext('2d').drawImage(photo, 0, 0);
+  $('gen-drop').hidden = true;
+  $('gen-reuse').hidden = true;
+  $('gen-photo').hidden = false;
+  updateGen();
+}
+
+function pickGenStyle(id) {
+  gen.styleId = id;
+  pressed($('gen-styles'), (b) => b.dataset.id === id);
+  updateGen();
+}
+
+function updateGen() {
+  $('gen-go').disabled = !(gen.photo && gen.styleId);
+  $('gen-colour-name').textContent = state.colour.name;
+}
+
+STYLES.forEach((x) => {
+  const b = document.createElement('button');
+  b.className = 'chip';
+  b.dataset.id = x.id;
+  b.textContent = x.name;
+  b.onclick = () => pickGenStyle(x.id);
+  $('gen-styles').append(b);
+});
+
+$('gen-file').onchange = async (e) => {
+  const file = e.target.files[0];
+  if (file) setGenPhoto(await loadPhoto(file));
+};
+$('gen-change').onclick = () => $('gen-file').click();
+$('gen-reuse').onclick = () => state.photo && setGenPhoto(state.photo);
+
+// 由其他區跳過嚟：帶埋髮型同相
+function openPreview(styleId) {
+  if (styleId) pickGenStyle(styleId);
+  if (!gen.photo && state.photo) setGenPhoto(state.photo);
+  $('preview').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+$('gen-go').onclick = async () => {
+  const st = $('gen-status');
+  const style = STYLES.find((x) => x.id === gen.styleId);
+  $('gen-go').disabled = true;
+  $('gen-result').hidden = true;
+  status(st, `⏳ AI 正在為你生成「${style.name}」效果圖 大約要 10 至 30 秒…`);
+  try {
+    const res = await fetch('api/preview', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        image: gen.photo.toDataURL('image/jpeg', 0.9),
+        styleId: gen.styleId,
+        colourId: $('gen-colour').checked ? state.colour.id : null,
+      }),
+    });
+    let data = {};
+    try { data = await res.json(); } catch { /* 靜態網站冇伺服器 */ }
+    if (!res.ok || !data.image) {
+      status(st, data.error || 'AI 效果圖暫時未開放 可以先試 AI 染髮同髮型速配。');
+      return;
+    }
+    $('gen-img').src = data.image;
+    $('gen-save').href = data.image;
+    setBook($('gen-book'), `你好 Fion 我試咗 AI 效果圖 想約剪「${style.name}」`);
+    $('gen-result').hidden = false;
+    status(st, '');
+    $('gen-result').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch (e) {
+    console.error(e);
+    status(st, '網絡有問題 請再試一次。');
+  } finally {
+    updateGen();
+  }
+};
+
 // ---------- 熱門髮型 ----------
 $('trend-cards').innerHTML = STYLES.map((x) => {
   const wa = waLink(`你好 Fion 我想約剪「${x.name}」`);
@@ -233,9 +320,16 @@ $('trend-cards').innerHTML = STYLES.map((x) => {
     <h3>${x.name}</h3>
     <p class="tagline">${x.tagline}</p>
     <p>${x.description}</p>
-    ${wa ? `<a class="card-link" href="${wa}" target="_blank" rel="noopener">約 Fion 剪呢款 →</a>` : ''}
+    <div class="card-links">
+      <button class="card-link" data-try="${x.id}">✨ AI 試呢款</button>
+      ${wa ? `<a class="card-link" href="${wa}" target="_blank" rel="noopener">約 Fion 剪呢款 →</a>` : ''}
+    </div>
   </article>`;
 }).join('');
+$('trend-cards').onclick = (e) => {
+  const id = e.target.closest('[data-try]')?.dataset.try;
+  if (id) openPreview(id);
+};
 
 // ---------- 預約 / 其他 ----------
 setBook($('book-main'), '你好 Fion 我想預約');

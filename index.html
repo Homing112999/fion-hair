@@ -22,7 +22,7 @@
     <nav>
       <a href="#dye">AI 染髮</a>
       <a href="#style">AI 髮型</a>
-      <a href="#trends">熱門</a>
+      <a href="#preview">效果圖</a>
       <a href="#book" class="nav-book">預約</a>
     </nav>
   </header>
@@ -35,8 +35,9 @@
       <div class="hero-cta">
         <a class="btn" href="#dye">試 AI 染髮</a>
         <a class="btn ghost" href="#style">試 AI 髮型速配</a>
+        <a class="btn ghost" href="#preview">AI 換髮型效果圖</a>
       </div>
-      <p class="privacy">🔒 相片只喺你部手機處理 唔會上傳</p>
+      <p class="privacy">🔒 AI 染髮同面型分析只喺你部手機處理 唔會上傳</p>
     </section>
 
     <!-- AI 染髮 -->
@@ -116,9 +117,52 @@
         <ul class="alts" id="res-alts"></ul>
         <div class="actions">
           <a class="btn small wa" id="style-book" target="_blank" rel="noopener" hidden>WhatsApp 約 Fion 剪呢款</a>
+          <a class="btn small ghost" id="style-ai" href="#preview">睇 AI 效果圖</a>
           <a class="btn small ghost" id="style-dm" target="_blank" rel="noopener" hidden>DM Fion</a>
         </div>
         <p class="fine">結果只係方向建議 最終剪裁方案要 Fion 現場睇你嘅髮量同髮流先確定。</p>
+      </div>
+    </section>
+
+    <!-- AI 換髮型效果圖 -->
+    <section id="preview" class="tool">
+      <div class="tool-head">
+        <p class="step">03</p>
+        <h2>AI 換髮型效果圖</h2>
+        <p>上傳一張正面清晰相片 揀一款想試嘅髮型 AI 會畫出你換髮型後嘅樣。</p>
+        <p class="hint">生成效果圖時 相片會傳去 AI 伺服器處理 我哋唔會儲存你嘅相。</p>
+      </div>
+
+      <div class="stage">
+        <label class="drop slim" id="gen-drop">
+          <input type="file" accept="image/*" id="gen-file" hidden>
+          <span class="drop-icon">🖼️</span>
+          <strong>上載你嘅正面相片</strong>
+          <small>建議光線充足 正面望鏡頭</small>
+        </label>
+        <div class="gen-photo" id="gen-photo" hidden>
+          <canvas id="gen-src"></canvas>
+          <button class="btn ghost small" id="gen-change">換一張相片</button>
+        </div>
+        <button class="btn ghost small" id="gen-reuse" hidden>用返啱先嗰張相</button>
+      </div>
+
+      <h3 class="sub">揀一款想試嘅髮型</h3>
+      <div class="chips" id="gen-styles"></div>
+      <label class="check"><input type="checkbox" id="gen-colour"> 連埋染埋我喺上面揀咗嘅髮色（<span id="gen-colour-name"></span>）</label>
+
+      <div class="actions">
+        <button class="btn" id="gen-go" disabled>✨ 生成 AI 效果圖</button>
+      </div>
+      <p class="status" id="gen-status" hidden></p>
+
+      <div class="gen-result" id="gen-result" hidden>
+        <img id="gen-img" alt="AI 效果圖">
+        <p class="fine">以上效果圖由 AI 根據你嘅相片同所揀款式生成 實際效果會因應真實髮量、髮質同頭型有落差 並非 100% 精準預覽。</p>
+        <div class="actions">
+          <a class="btn small wa" id="gen-book" target="_blank" rel="noopener" hidden>WhatsApp 約 Fion 剪呢款</a>
+          <a class="btn small ghost" id="gen-save" download="fion-ai.png">儲存效果圖</a>
+        </div>
       </div>
     </section>
 

@@ -195,3 +195,14 @@ footer .fine { font-size: 12px; }
 .card h3 { font-size: 19px; margin-bottom: 4px; }
 .card p { margin: 0 0 8px; font-size: 15px; }
 .card-link { font-weight: 700; color: var(--accent); text-decoration: none; font-size: 14px; }
+
+/* AI 換髮型效果圖 */
+.gen-photo { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.gen-photo canvas { max-height: 320px; width: auto; border-radius: var(--radius); }
+.check { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; font-size: 14px; color: var(--ink-soft); }
+.check input { margin-top: 4px; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.gen-result { margin-top: 20px; }
+.gen-result img { width: 100%; border-radius: var(--radius); }
+.card-links { display: flex; flex-wrap: wrap; gap: 14px; }
+button.card-link { background: none; border: 0; padding: 0; cursor: pointer; font-family: var(--sans); }
