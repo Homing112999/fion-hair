@@ -46,9 +46,68 @@ export async function hairMask(canvas) {
   const masks = result.confidenceMasks;
   // hair_segmenter 有兩個 mask：0 = 背景 1 = 頭髮
   const m = masks[masks.length - 1];
-  const data = Float32Array.from(m.getAsFloat32Array());
-  const out = { data, width: m.width, height: m.height };
+  const raw = Float32Array.from(m.getAsFloat32Array());
+  const { width, height } = m;
   masks.forEach((x) => x.close());
+  return { data: refineMask(raw, canvas, width, height), width, height };
+}
+
+// 盒狀模糊（用積分圖 快）
+function boxBlur(src, w, h, r) {
+  const integ = new Float64Array((w + 1) * (h + 1));
+  for (let y = 0; y < h; y++) {
+    let row = 0;
+    for (let x = 0; x < w; x++) {
+      row += src[y * w + x];
+      integ[(y + 1) * (w + 1) + x + 1] = integ[y * (w + 1) + x + 1] + row;
+    }
+  }
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const y0 = Math.max(0, y - r), y1 = Math.min(h, y + r + 1);
+    for (let x = 0; x < w; x++) {
+      const x0 = Math.max(0, x - r), x1 = Math.min(w, x + r + 1);
+      const sum = integ[y1 * (w + 1) + x1] - integ[y0 * (w + 1) + x1] - integ[y1 * (w + 1) + x0] + integ[y0 * (w + 1) + x0];
+      out[y * w + x] = sum / ((x1 - x0) * (y1 - y0));
+    }
+  }
+  return out;
+}
+
+// Guided filter：等遮罩邊緣跟返髮絲 唔會一嚿嚿
+function refineMask(p, canvas, w, h) {
+  let src = canvas;
+  if (canvas.width !== w || canvas.height !== h) {
+    src = document.createElement('canvas');
+    src.width = w; src.height = h;
+    src.getContext('2d').drawImage(canvas, 0, 0, w, h);
+  }
+  const px = src.getContext('2d').getImageData(0, 0, w, h).data;
+  const n = w * h;
+  const I = new Float32Array(n), Ip = new Float32Array(n), II = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const v = (px[i * 4] * 0.299 + px[i * 4 + 1] * 0.587 + px[i * 4 + 2] * 0.114) / 255;
+    I[i] = v; Ip[i] = v * p[i]; II[i] = v * v;
+  }
+  const r = Math.max(2, Math.round(Math.min(w, h) / 120));
+  const eps = 0.0015;
+  const mI = boxBlur(I, w, h, r), mp = boxBlur(p, w, h, r);
+  const mIp = boxBlur(Ip, w, h, r), mII = boxBlur(II, w, h, r);
+  const a = new Float32Array(n), b = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const cov = mIp[i] - mI[i] * mp[i];
+    const v = mII[i] - mI[i] * mI[i];
+    a[i] = cov / (v + eps);
+    b[i] = mp[i] - a[i] * mI[i];
+  }
+  const ma = boxBlur(a, w, h, r), mb = boxBlur(b, w, h, r);
+  // 唔准離原本遮罩太遠 防止染到背景
+  const near = boxBlur(p, w, h, r);
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const q = ma[i] * I[i] + mb[i];
+    out[i] = Math.max(0, Math.min(1, q, near[i] * 1.25));
+  }
   return out;
 }
 
@@ -103,32 +162,51 @@ export function estimateBase(imageData, mask) {
 }
 
 // 將頭髮染成目標色 回傳新嘅 ImageData
+// 做法似真染髮：保留原本髮絲明暗同反光 淺色會見到多啲層次 暗位同高光顏色會淡啲
 export function recolour(imageData, mask, hex, baseLevel, chroma = 1) {
   const { data, width, height } = imageData;
   const out = new ImageData(new Uint8ClampedArray(data), width, height);
   const o = out.data;
   const [tL, ta, tb] = rgbToLab(...hexToRgb(hex));
+  const tC = Math.hypot(ta, tb);
+  const hue = Math.atan2(tb, ta);
 
-  // 頭髮平均光暗 用嚟保留原本嘅紋理同光影
-  let sum = 0, n = 0;
-  const Ls = new Float32Array(mask.data.length);
-  for (let i = 0; i < mask.data.length; i++) {
-    if (mask.data[i] < 0.15) continue;
+  const n = mask.data.length;
+  const Ls = new Float32Array(n), As = new Float32Array(n), Bs = new Float32Array(n);
+  let sum = 0, sum2 = 0, cnt = 0;
+  for (let i = 0; i < n; i++) {
+    if (mask.data[i] < 0.05) continue;
     const p = i * 4;
-    Ls[i] = rgbToLab(data[p], data[p + 1], data[p + 2])[0];
-    if (mask.data[i] > 0.6) { sum += Ls[i]; n++; }
+    const [L, A, B] = rgbToLab(data[p], data[p + 1], data[p + 2]);
+    Ls[i] = L; As[i] = A; Bs[i] = B;
+    if (mask.data[i] > 0.6) { sum += L; sum2 += L * L; cnt++; }
   }
-  if (!n) return out;
-  const meanL = sum / n;
+  if (!cnt) return out;
+  const meanL = sum / cnt;
+  const sd = Math.sqrt(Math.max(1, sum2 / cnt - meanL * meanL));
   const goalL = Math.min(tL, BASE_MAX_L[baseLevel] ?? 80);
+  // 染淺咗 髮絲層次會明顯啲；染深咗 層次會收埋啲
+  const want = Math.max(5, Math.min(16, sd * (0.7 + goalL / 70)));
+  const gain = Math.max(0.6, Math.min(2.4, want / sd));
 
-  for (let i = 0; i < mask.data.length; i++) {
-    const alpha = smooth(0.15, 0.75, mask.data[i]);
+  for (let i = 0; i < n; i++) {
+    const alpha = smooth(0.06, 0.55, mask.data[i]);
     if (alpha <= 0) continue;
     const p = i * 4;
-    const L = Math.max(2, Math.min(98, goalL + (Ls[i] - meanL) * 0.85));
-    const k = chroma * Math.max(0.35, Math.min(1.25, L / Math.max(goalL, 1)));
-    const [r, g, b] = labToRgb(L, ta * k, tb * k);
+    const d = (Ls[i] - meanL) * gain;
+    // 軟性壓頂 避免光位死白、暗位死黑
+    let L = goalL + d;
+    L = L > 88 ? 88 + (L - 88) * 0.3 : L < 6 ? 6 - (6 - L) * 0.3 : L;
+    L = Math.max(2, Math.min(97, L));
+    // 中間調最飽和 暗位同高光淡啲
+    const rel = (L - goalL) / 25;
+    const sat = chroma * Math.max(0.45, 1 - 0.35 * rel * rel) * Math.min(1.1, 0.5 + L / 40);
+    // 高光帶少少暖 暗位少少冷 好似真頭髮
+    const h = hue + Math.max(-0.12, Math.min(0.12, rel * 0.08));
+    const C = tC * sat;
+    const a = Math.cos(h) * C + As[i] * 0.08;
+    const bb = Math.sin(h) * C + Bs[i] * 0.08;
+    const [r, g, b] = labToRgb(L, a, bb);
     o[p] = data[p] + (r - data[p]) * alpha;
     o[p + 1] = data[p + 1] + (g - data[p + 1]) * alpha;
     o[p + 2] = data[p + 2] + (b - data[p + 2]) * alpha;
