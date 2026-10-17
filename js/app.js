@@ -215,8 +215,12 @@ async function analyseFace(photo) {
       status(st, '搵唔到塊面 😅 試吓正面望鏡頭再影過 或者喺下面自己揀。');
       return;
     }
-    status(st, `AI 估你係「${FACE_SHAPES[r.shape].name}」 唔啱可以喺下面改。`);
     choose('faceShape', r.shape);
+    const left = [!answers.texture && '髮質', !answers.maintenance && '打理習慣'].filter(Boolean);
+    status(st, left.length
+      ? `✅ AI 估你係「${FACE_SHAPES[r.shape].name}」 再揀埋下面嘅${left.join('同')}就即刻出結果 👇`
+      : `✅ AI 估你係「${FACE_SHAPES[r.shape].name}」 唔啱可以喺下面改。`);
+    if (left.length) $(answers.texture ? 'opt-maint' : 'opt-texture').scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (e) {
     console.error(e);
     status(st, '出咗少少問題 請再試一次或者喺下面自己揀。');
