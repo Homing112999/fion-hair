@@ -2,6 +2,8 @@
   "name": "fion-hair",
   "main": "worker.js",
   "compatibility_date": "2025-09-01",
+  // Google Gemini 唔支援香港 所以叫 AI 嗰部分固定喺美國行
+  "placement": { "region": "gcp:us-central1" },
   "assets": {
     "directory": "./",
     "binding": "ASSETS",

@@ -62,8 +62,9 @@ export async function onRequestPost({ request, env }) {
   });
 
   if (!res.ok) {
-    console.log('gemini error', res.status, (await res.text()).slice(0, 500));
-    return json({ error: '生成失敗 請再試一次' }, 502);
+    const detail = (await res.text()).slice(0, 500);
+    console.log('gemini error', res.status, detail);
+    return json({ error: geminiError(res.status, detail) }, 502);
   }
 
   const data = await res.json();
@@ -76,3 +77,12 @@ export async function onRequestPost({ request, env }) {
   return json({ image: `data:${img.mimeType || img.mime_type || 'image/png'};base64,${img.data}` });
 }
 
+// 將 Google 嘅錯誤講返做人話 方便搵原因（後面個編號係 Google 回覆嘅狀態碼）
+function geminiError(status, detail) {
+  if (/API key not valid|API_KEY_INVALID/i.test(detail)) return `生成失敗：Gemini key 唔啱 請喺 Cloudflare 重新貼過（${status}）`;
+  if (status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(detail)) return `生成失敗：Google 額度用完或者未開 billing（${status}）`;
+  if (status === 403) return `生成失敗：Gemini key 冇權限 可能未開 billing 或者地區唔支援（${status}）`;
+  if (status === 404) return `生成失敗：AI 型號搵唔到（${status}）`;
+  if (status === 400 && /location|region|country/i.test(detail)) return `生成失敗：Google 喺呢個地區未開放（${status}）`;
+  return `生成失敗 請再試一次（${status}）`;
+}
