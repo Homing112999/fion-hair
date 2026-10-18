@@ -81,6 +81,7 @@ function renderDye() {
   colourNote();
   $('gen-colour-name').textContent = state.colour.name;
   setBook($('dye-book'), `你好 Fion 我想約染髮 想試「${state.colour.name}」（底色大約${state.base}度）`);
+  $('dye-ai-result').hidden = true;
   if (!state.mask) return;
   // 底色唔夠淺嘅話 顏色會淡啲 似返現實
   const chroma = state.colour.lift > state.base ? 0.6 : 1;
@@ -116,6 +117,9 @@ async function onDyeFile(file) {
     }
     $('dye-change').hidden = false;
     $('dye-save').hidden = !state.mask;
+    $('dye-ai').hidden = false;
+    $('dye-ai-hint').hidden = false;
+    $('dye-ai-result').hidden = true;
     $('style-reuse').hidden = false;
     if (!gen.photo) $('gen-reuse').hidden = false;
     renderDye();
@@ -126,6 +130,40 @@ async function onDyeFile(file) {
 }
 
 $('dye-file').onchange = (e) => onDyeFile(e.target.files[0]);
+
+// AI 真實染髮：交畀 Gemini 好似真染咁重畫
+$('dye-ai').onclick = async () => {
+  if (!state.photo) return;
+  const st = $('dye-ai-status');
+  const colour = state.colour;
+  $('dye-ai').disabled = true;
+  $('dye-ai-result').hidden = true;
+  status(st, `⏳ AI 正在幫你染「${colour.name}」 大約要 10 至 30 秒…`);
+  try {
+    const res = await fetch('api/preview', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ mode: 'dye', image: state.photo.toDataURL('image/jpeg', 0.9), colourId: colour.id, base: state.base }),
+    });
+    let data = {};
+    try { data = await res.json(); } catch { /* 靜態網站冇伺服器 */ }
+    if (!res.ok || !data.image) {
+      status(st, data.error || 'AI 真實染髮暫時未開放 可以先睇上面嘅即時預覽。');
+      return;
+    }
+    $('dye-ai-img').src = data.image;
+    $('dye-ai-save').href = data.image;
+    $('dye-ai-save').download = `fion-${colour.name}-AI.png`;
+    $('dye-ai-result').hidden = false;
+    status(st, '');
+    $('dye-ai-result').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch (e) {
+    console.error(e);
+    status(st, '網絡有問題 請再試一次。');
+  } finally {
+    $('dye-ai').disabled = false;
+  }
+};
 $('dye-change').onclick = () => $('dye-file').click();
 $('dye-slider').oninput = (e) => {
   const v = e.target.value;

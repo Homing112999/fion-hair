@@ -21,6 +21,20 @@ export function buildPrompt(style, colour) {
   ].join(' ');
 }
 
+// AI 真實染髮：淨係換髮色 其他一律唔郁
+export function buildDyePrompt(colour, base) {
+  const dark = colour.lift > (Number(base) || 3);
+  return [
+    'Edit this photo. Recolour ONLY the hair of the person, as if a professional colourist in a Hong Kong salon just dyed it',
+    `to "${colour.id.replace(/-/g, ' ')}" (${colour.note}), target shade close to ${colour.hex}.`,
+    dark
+      ? 'The natural hair is dark and was not bleached, so the new colour should read subtly: richer and tinted in the light, deeper in the shadows, like real dye on dark Asian hair.'
+      : 'Make the colour clearly visible but natural.',
+    'Keep the haircut, length, volume, parting and every strand exactly as they are. Keep natural strand-level variation, shine, highlights and shadows, slightly deeper tone near the roots, and soft edges where hair meets skin and background.',
+    'Do not change the face, identity, skin tone, eyebrows, makeup, clothing, background, lighting or camera angle. Photorealistic. No text, no watermark.',
+  ].join(' ');
+}
+
 async function overLimit(env, request) {
   if (!env.LIMITS) return false;
   const ip = request.headers.get('cf-connecting-ip') || 'unknown';
@@ -41,9 +55,11 @@ export async function onRequestPost({ request, env, fetchGemini = fetch }) {
     return json({ error: '資料格式唔啱' }, 400);
   }
 
-  const style = STYLES.find((s) => s.id === body.styleId);
-  if (!style) return json({ error: '搵唔到呢款髮型' }, 400);
+  const dye = body.mode === 'dye';
+  const style = dye ? null : STYLES.find((s) => s.id === body.styleId);
+  if (!dye && !style) return json({ error: '搵唔到呢款髮型' }, 400);
   const colour = body.colourId ? COLOURS.find((c) => c.id === body.colourId) : null;
+  if (dye && !colour) return json({ error: '搵唔到呢隻髮色' }, 400);
 
   const m = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(body.image || '');
   if (!m) return json({ error: '請上載 JPG 或 PNG 相片' }, 400);
@@ -56,7 +72,7 @@ export async function onRequestPost({ request, env, fetchGemini = fetch }) {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: buildPrompt(style, colour) }, { inline_data: { mime_type: m[1], data: m[2] } }] }],
+      contents: [{ parts: [{ text: dye ? buildDyePrompt(colour, body.base) : buildPrompt(style, colour) }, { inline_data: { mime_type: m[1], data: m[2] } }] }],
       generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
     }),
   });
