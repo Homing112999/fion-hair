@@ -269,24 +269,37 @@ export async function compositeRestyle(origCanvas, genImage) {
   const [ma, mb] = [await hairMask(origCanvas), await hairMask(gc)];
   const union = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) union[i] = Math.max(ma.data[i], mb.data[i]);
-  const grown = boxBlur(union, w, h, Math.max(3, Math.round(Math.min(w, h) / 40)));
+  const grown = boxBlur(union, w, h, Math.max(3, Math.round(Math.min(w, h) / 60)));
   const o = origCanvas.getContext('2d').getImageData(0, 0, w, h);
   const g = gctx.getImageData(0, 0, w, h);
   let diff = 0, cnt = 0;
+  // 頭髮範圍外圍一圈 用嚟校正 AI 圖嘅膚色同光暗 避免舊頭髮位出現色差
+  const off = [0, 0, 0];
+  let ring = 0;
   const alpha = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) {
-    alpha[i] = smooth(0.04, 0.3, grown[i]);
+    alpha[i] = smooth(0.03, 0.5, grown[i]);
+    const j = i * 4;
     if (alpha[i] === 0 && i % 7 === 0) {
-      const j = i * 4;
       diff += Math.abs(o.data[j] - g.data[j]) + Math.abs(o.data[j + 1] - g.data[j + 1]) + Math.abs(o.data[j + 2] - g.data[j + 2]);
       cnt++;
     }
+    if (grown[i] > 0.005 && grown[i] < 0.06) {
+      for (let k = 0; k < 3; k++) off[k] += o.data[j + k] - g.data[j + k];
+      ring++;
+    }
   }
   if (!cnt || diff / cnt / 3 > 28) return null;
+  if (ring) for (let k = 0; k < 3; k++) off[k] = Math.max(-40, Math.min(40, off[k] / ring));
   for (let i = 0; i < w * h; i++) {
     const a = alpha[i];
     if (!a) continue;
-    for (let k = 0; k < 3; k++) o.data[i * 4 + k] = o.data[i * 4 + k] * (1 - a) + g.data[i * 4 + k] * a;
+    // 新頭髮保持 AI 原色 其餘（皮膚 背景）校正色差
+    const fix = 1 - smooth(0.2, 0.7, mb.data[i]);
+    for (let k = 0; k < 3; k++) {
+      const gv = g.data[i * 4 + k] + off[k] * fix;
+      o.data[i * 4 + k] = o.data[i * 4 + k] * (1 - a) + gv * a;
+    }
   }
   return o;
 }
