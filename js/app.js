@@ -337,35 +337,40 @@ $('gen-go').onclick = async () => {
   $('gen-result').hidden = true;
   status(st, `⏳ AI 正在為你生成「${style.name}」效果圖 大約要 10 至 30 秒…`);
   try {
-    const res = await fetch('api/preview', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        image: gen.photo.toDataURL('image/jpeg', 0.9),
-        styleId: gen.styleId,
-        colourId: $('gen-colour').checked ? state.colour.id : null,
-      }),
-    });
-    let data = {};
-    try { data = await res.json(); } catch { /* 靜態網站冇伺服器 */ }
-    if (!res.ok || !data.image) {
-      status(st, data.error || 'AI 效果圖暫時未開放 可以先試 AI 染髮同髮型速配。');
-      return;
-    }
-    // 塊面 眼鏡 衫 背景用返原相 淨係換頭髮
-    let url = data.image;
-    try {
-      const img = new Image();
-      img.src = data.image;
-      await img.decode();
-      const mixed = await compositeRestyle(gen.photo, img);
-      if (mixed) {
-        const c = document.createElement('canvas');
-        c.width = mixed.width; c.height = mixed.height;
-        c.getContext('2d').putImageData(mixed, 0, 0);
-        url = c.toDataURL('image/jpeg', 0.92);
+    // AI 有時會成張相重新構圖（郁咗個人） 對唔齊就自動再試 最多三次
+    let url = null;
+    for (let attempt = 1; attempt <= 3 && !url; attempt++) {
+      if (attempt > 1) status(st, `⏳ AI 張圖郁咗你個樣 自動再畫一次（第 ${attempt} 次）…`);
+      const res = await fetch('api/preview', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          image: gen.photo.toDataURL('image/jpeg', 0.9),
+          styleId: gen.styleId,
+          colourId: $('gen-colour').checked ? state.colour.id : null,
+        }),
+      });
+      let data = {};
+      try { data = await res.json(); } catch { /* 靜態網站冇伺服器 */ }
+      if (!res.ok || !data.image) {
+        status(st, data.error || 'AI 效果圖暫時未開放 可以先試 AI 染髮同髮型速配。');
+        return;
       }
-    } catch (e) { console.error(e); }
+      // 塊面 眼鏡 衫 背景用返原相 淨係換頭髮
+      try {
+        const img = new Image();
+        img.src = data.image;
+        await img.decode();
+        const mixed = await compositeRestyle(gen.photo, img);
+        if (mixed) {
+          const c = document.createElement('canvas');
+          c.width = mixed.width; c.height = mixed.height;
+          c.getContext('2d').putImageData(mixed, 0, 0);
+          url = c.toDataURL('image/jpeg', 0.92);
+        }
+      } catch (e) { console.error(e); }
+      if (!url && attempt === 3) url = data.image;
+    }
     $('gen-img').src = url;
     $('gen-save').href = url;
     setBook($('gen-book'), `你好 Fion 我試咗 AI 效果圖 想約剪「${style.name}」`);
