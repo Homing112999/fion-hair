@@ -266,6 +266,14 @@ export async function compositeRestyle(origCanvas, genImage) {
   gc.width = w; gc.height = h;
   const gctx = gc.getContext('2d');
   gctx.drawImage(genImage, 0, 0, w, h);
+  // 對位檢查：兩張相嘅眼角同鼻尖位置要差唔多 否則 AI 已經移過個人
+  const lm = await landmarker();
+  const pa = lm.detect(origCanvas).faceLandmarks?.[0];
+  const pb = lm.detect(gc).faceLandmarks?.[0];
+  if (!pa || !pb) return null;
+  const faceW = dist(pa[234], pa[454], w, h);
+  const shift = Math.max(...[33, 263, 1, 152].map((k) => dist(pa[k], pb[k], w, h)));
+  if (shift > faceW * 0.04) return null;
   const [ma, mb] = [await hairMask(origCanvas), await hairMask(gc)];
   const union = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) union[i] = Math.max(ma.data[i], mb.data[i]);
@@ -289,7 +297,7 @@ export async function compositeRestyle(origCanvas, genImage) {
       ring++;
     }
   }
-  if (!cnt || diff / cnt / 3 > 28) return null;
+  if (!cnt || diff / cnt / 3 > 20) return null;
   if (ring) for (let k = 0; k < 3; k++) off[k] = Math.max(-40, Math.min(40, off[k] / ring));
   for (let i = 0; i < w * h; i++) {
     const a = alpha[i];
