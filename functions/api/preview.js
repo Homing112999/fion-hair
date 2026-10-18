@@ -16,6 +16,7 @@ export function buildPrompt(style, colour) {
   // 「同一個髮型」嗰類（例如挑染 曲髮）唔使剪 其他就要明顯換髮型
   const keepCut = /^(the same hairstyle|hair )/.test(style.genPrompt);
   return [
+    'Keep the exact same photo: same framing, crop, zoom, people, pose, head angle and gaze.',
     keepCut ? `Restyle the hair of the person in this photo: ${hair}.` : `Give the person in this photo a completely new haircut: ${hair}.`,
     keepCut
       ? 'The change must be clearly visible and match the description exactly, not a filter, tint or lighting tweak.'
@@ -78,7 +79,7 @@ export async function onRequestPost({ request, env, fetchGemini = fetch }) {
     headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
     body: JSON.stringify({
       contents: [{ parts: [{ text: dye ? buildDyePrompt(colour, body.base) : buildPrompt(style, colour) }, { inline_data: { mime_type: m[1], data: m[2] } }] }],
-      generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: dye ? 0.2 : 0.5 },
+      generationConfig: { responseModalities: ['TEXT', 'IMAGE'], ...(dye ? { temperature: 0.2 } : {}) },
     }),
   });
 

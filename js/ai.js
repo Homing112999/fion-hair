@@ -257,3 +257,36 @@ export function compositeHair(imageData, genImage, mask) {
   }
   return out;
 }
+
+// AI 效果圖：新舊頭髮範圍（再放大少少）用 AI 圖 其他（塊面 眼鏡 衫 背景）用返原相
+// AI 如果將成張相重新構圖 就對唔齊 嗰陣直接用 AI 原圖
+export async function compositeRestyle(origCanvas, genImage) {
+  const w = origCanvas.width, h = origCanvas.height;
+  const gc = document.createElement('canvas');
+  gc.width = w; gc.height = h;
+  const gctx = gc.getContext('2d');
+  gctx.drawImage(genImage, 0, 0, w, h);
+  const [ma, mb] = [await hairMask(origCanvas), await hairMask(gc)];
+  const union = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) union[i] = Math.max(ma.data[i], mb.data[i]);
+  const grown = boxBlur(union, w, h, Math.max(3, Math.round(Math.min(w, h) / 40)));
+  const o = origCanvas.getContext('2d').getImageData(0, 0, w, h);
+  const g = gctx.getImageData(0, 0, w, h);
+  let diff = 0, cnt = 0;
+  const alpha = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    alpha[i] = smooth(0.04, 0.3, grown[i]);
+    if (alpha[i] === 0 && i % 7 === 0) {
+      const j = i * 4;
+      diff += Math.abs(o.data[j] - g.data[j]) + Math.abs(o.data[j + 1] - g.data[j + 1]) + Math.abs(o.data[j + 2] - g.data[j + 2]);
+      cnt++;
+    }
+  }
+  if (!cnt || diff / cnt / 3 > 28) return null;
+  for (let i = 0; i < w * h; i++) {
+    const a = alpha[i];
+    if (!a) continue;
+    for (let k = 0; k < 3; k++) o.data[i * 4 + k] = o.data[i * 4 + k] * (1 - a) + g.data[i * 4 + k] * a;
+  }
+  return o;
+}

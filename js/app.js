@@ -1,5 +1,5 @@
 import { SHOP, COLOURS, BASES, FACE_SHAPES, TEXTURES, MAINTENANCE, STYLES } from './data.js';
-import { preload, hairMask, recolour, estimateBase, faceShape, compositeHair } from './ai.js';
+import { preload, hairMask, recolour, estimateBase, faceShape, compositeHair, compositeRestyle } from './ai.js';
 
 const $ = (id) => document.getElementById(id);
 const MAX_SIDE = 1024;
@@ -352,8 +352,22 @@ $('gen-go').onclick = async () => {
       status(st, data.error || 'AI 效果圖暫時未開放 可以先試 AI 染髮同髮型速配。');
       return;
     }
-    $('gen-img').src = data.image;
-    $('gen-save').href = data.image;
+    // 塊面 眼鏡 衫 背景用返原相 淨係換頭髮
+    let url = data.image;
+    try {
+      const img = new Image();
+      img.src = data.image;
+      await img.decode();
+      const mixed = await compositeRestyle(gen.photo, img);
+      if (mixed) {
+        const c = document.createElement('canvas');
+        c.width = mixed.width; c.height = mixed.height;
+        c.getContext('2d').putImageData(mixed, 0, 0);
+        url = c.toDataURL('image/jpeg', 0.92);
+      }
+    } catch (e) { console.error(e); }
+    $('gen-img').src = url;
+    $('gen-save').href = url;
     setBook($('gen-book'), `你好 Fion 我試咗 AI 效果圖 想約剪「${style.name}」`);
     $('gen-result').hidden = false;
     status(st, '');
