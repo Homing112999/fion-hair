@@ -31,7 +31,7 @@ async function overLimit(env, request) {
   return false;
 }
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost({ request, env, fetchGemini = fetch }) {
   if (!env.GEMINI_API_KEY) return json({ error: 'AI 效果圖暫時未開放' }, 503);
 
   let body;
@@ -52,7 +52,7 @@ export async function onRequestPost({ request, env }) {
   if (await overLimit(env, request)) return json({ error: '今日試咗好多次喇 聽日再嚟試 或者直接 WhatsApp Fion' }, 429);
 
   const model = env.GEMINI_MODEL || 'gemini-2.5-flash-image';
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+  const res = await fetchGemini(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
     body: JSON.stringify({

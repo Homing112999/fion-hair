@@ -4,6 +4,9 @@
   "compatibility_date": "2025-09-01",
   // Google Gemini 唔支援香港 所以叫 AI 嗰部分固定喺美國行
   "placement": { "region": "gcp:us-central1" },
+  // 保險：真正叫 Gemini 嗰下經美國西岸嘅 Durable Object（worker.js 入面 GeminiRelay）
+  "durable_objects": { "bindings": [{ "name": "GEMINI_RELAY", "class_name": "GeminiRelay" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GeminiRelay"] }],
   "assets": {
     "directory": "./",
     "binding": "ASSETS",
