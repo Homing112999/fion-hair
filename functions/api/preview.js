@@ -13,12 +13,17 @@ export function buildPrompt(style, colour) {
   const hair = colour
     ? `${style.genPrompt}, with the hair coloured ${colour.hex} (a ${colour.id.replace(/-/g, ' ')} shade)`
     : `${style.genPrompt}, keeping the person's current hair colour`;
+  // 「同一個髮型」嗰類（例如挑染 曲髮）唔使剪 其他就要明顯換髮型
+  const keepCut = /^(the same hairstyle|hair )/.test(style.genPrompt);
   return [
-    'Edit this photo. Change ONLY the hairstyle of the person to:',
-    hair + '.',
-    'Keep the face, identity, facial features, skin tone, expression, makeup, clothing, background, lighting and camera angle exactly the same.',
+    keepCut ? `Restyle the hair of the person in this photo: ${hair}.` : `Give the person in this photo a completely new haircut: ${hair}.`,
+    keepCut
+      ? 'The change must be clearly visible and match the description exactly, not a filter, tint or lighting tweak.'
+      : 'This must be an obvious salon transformation of the hair shape, length, fringe and layers that matches the description exactly, not a filter, tint or lighting tweak. Redraw the whole hair region from scratch.',
+    keepCut ? '' : 'If the new style is longer than the current hair, add realistic new hair; if it is shorter, remove hair and fill in the neck, shoulders and background naturally.',
+    "Keep the person's face, identity, facial features, skin tone, expression, glasses, clothing, background and camera angle the same. Do not change the overall colour grading of the photo.",
     'The result must look like a real photo taken right after a professional salon visit. No text, no watermark.',
-  ].join(' ');
+  ].filter(Boolean).join(' ');
 }
 
 // AI 真實染髮：淨係換髮色 其他一律唔郁
