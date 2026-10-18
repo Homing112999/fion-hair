@@ -21,7 +21,7 @@ export function buildPrompt(style, colour) {
       ? 'The change must be clearly visible and match the description exactly, not a filter, tint or lighting tweak.'
       : 'This must be an obvious salon transformation of the hair shape, length, fringe and layers that matches the description exactly, not a filter, tint or lighting tweak. Redraw the whole hair region from scratch.',
     keepCut ? '' : 'If the new style is longer than the current hair, add realistic new hair; if it is shorter, remove hair and fill in the neck, shoulders and background naturally.',
-    "Keep the person's face, identity, facial features, skin tone, expression, glasses, clothing, background and camera angle the same. Do not change the overall colour grading of the photo.",
+    "Keep the person's face, identity, facial features, skin tone, expression, glasses, clothing, background and camera angle the same. Do not slim, reshape or beautify the face, do not change the glasses frames, do not add jewellery or accessories. Do not change the overall colour grading of the photo.",
     'The result must look like a real photo taken right after a professional salon visit. No text, no watermark.',
   ].filter(Boolean).join(' ');
 }
@@ -78,7 +78,7 @@ export async function onRequestPost({ request, env, fetchGemini = fetch }) {
     headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
     body: JSON.stringify({
       contents: [{ parts: [{ text: dye ? buildDyePrompt(colour, body.base) : buildPrompt(style, colour) }, { inline_data: { mime_type: m[1], data: m[2] } }] }],
-      generationConfig: { responseModalities: ['TEXT', 'IMAGE'], ...(dye ? { temperature: 0.2 } : {}) },
+      generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: dye ? 0.2 : 0.5 },
     }),
   });
 
