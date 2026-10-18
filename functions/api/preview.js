@@ -30,8 +30,8 @@ export function buildDyePrompt(colour, base) {
     dark
       ? 'The natural hair is dark and was not bleached, so the new colour should read subtly: richer and tinted in the light, deeper in the shadows, like real dye on dark Asian hair.'
       : 'Make the colour clearly visible but natural.',
-    'Keep the haircut, length, volume, parting and every strand exactly as they are. Keep natural strand-level variation, shine, highlights and shadows, slightly deeper tone near the roots, and soft edges where hair meets skin and background.',
-    'Do not change the face, identity, skin tone, eyebrows, makeup, clothing, background, lighting or camera angle. Photorealistic. No text, no watermark.',
+    'This is a colour-only edit: only recolour the existing hair pixels. Do NOT change the haircut, length, parting, curl, waves or volume. Keep natural strand-level variation, shine, highlights and shadows, slightly deeper tone near the roots, and soft edges where hair meets skin and background.',
+    'Do NOT alter anything else: same face shape, identity, skin, eyebrows, makeup, glasses, jewellery, clothing, other people, background, lighting, framing and camera angle. No beautifying, no slimming. Output the same image size and composition. Photorealistic. No text, no watermark.',
   ].join(' ');
 }
 
@@ -73,7 +73,7 @@ export async function onRequestPost({ request, env, fetchGemini = fetch }) {
     headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
     body: JSON.stringify({
       contents: [{ parts: [{ text: dye ? buildDyePrompt(colour, body.base) : buildPrompt(style, colour) }, { inline_data: { mime_type: m[1], data: m[2] } }] }],
-      generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+      generationConfig: { responseModalities: ['TEXT', 'IMAGE'], ...(dye ? { temperature: 0.2 } : {}) },
     }),
   });
 

@@ -239,3 +239,21 @@ export function classify({ ratio, jaw, forehead }) {
   if (ratio < 1.08) return 'round';
   return 'oval';
 }
+
+// AI 真實染髮：淨係攞 AI 圖入面頭髮嗰部分 塊面 眼鏡 衫 背景全部用返原相
+export function compositeHair(imageData, genImage, mask) {
+  const { width: w, height: h } = imageData;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(genImage, 0, 0, w, h);
+  const gen = ctx.getImageData(0, 0, w, h);
+  const out = new ImageData(new Uint8ClampedArray(imageData.data), w, h);
+  const o = out.data, g = gen.data, m = mask.data;
+  for (let i = 0; i < w * h; i++) {
+    const a = smooth(0.08, 0.6, m[i]);
+    if (!a) continue;
+    for (let k = 0; k < 3; k++) o[i * 4 + k] = o[i * 4 + k] * (1 - a) + g[i * 4 + k] * a;
+  }
+  return out;
+}

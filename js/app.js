@@ -1,5 +1,5 @@
 import { SHOP, COLOURS, BASES, FACE_SHAPES, TEXTURES, MAINTENANCE, STYLES } from './data.js';
-import { preload, hairMask, recolour, estimateBase, faceShape } from './ai.js';
+import { preload, hairMask, recolour, estimateBase, faceShape, compositeHair } from './ai.js';
 
 const $ = (id) => document.getElementById(id);
 const MAX_SIDE = 1024;
@@ -151,9 +151,20 @@ $('dye-ai').onclick = async () => {
       status(st, data.error || 'AI 真實染髮暫時未開放 可以先睇上面嘅即時預覽。');
       return;
     }
-    $('dye-ai-img').src = data.image;
-    $('dye-ai-save').href = data.image;
-    $('dye-ai-save').download = `fion-${colour.name}-AI.png`;
+    // 只用 AI 畫嘅頭髮 其他保持原相 避免 AI 改咗塊面或者眼鏡
+    let url = data.image;
+    if (state.mask) {
+      const img = new Image();
+      img.src = data.image;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = state.original.width; c.height = state.original.height;
+      c.getContext('2d').putImageData(compositeHair(state.original, img, state.mask), 0, 0);
+      url = c.toDataURL('image/jpeg', 0.92);
+    }
+    $('dye-ai-img').src = url;
+    $('dye-ai-save').href = url;
+    $('dye-ai-save').download = `fion-${colour.name}-AI.jpg`;
     $('dye-ai-result').hidden = false;
     status(st, '');
     $('dye-ai-result').scrollIntoView({ behavior: 'smooth', block: 'center' });
