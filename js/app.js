@@ -81,12 +81,12 @@ function renderDye() {
   colourNote();
   $('gen-colour-name').textContent = state.colour.name;
   setBook($('dye-book'), `你好 Fion 我想約染髮 想試「${state.colour.name}」（底色大約${state.base}度）`);
-  $('dye-ai-result').hidden = true;
   if (!state.mask) return;
   // 底色唔夠淺嘅話 顏色會淡啲 似返現實
   const chroma = state.colour.lift > state.base ? 0.6 : 1;
   const out = recolour(state.original, state.mask, state.colour.hex, state.base, chroma);
   $('dye-after').getContext('2d').putImageData(out, 0, 0);
+  scheduleDyeAI();
 }
 
 async function onDyeFile(file) {
@@ -117,9 +117,8 @@ async function onDyeFile(file) {
     }
     $('dye-change').hidden = false;
     $('dye-save').hidden = !state.mask;
+    dyeCache.clear();
     $('dye-ai').hidden = false;
-    $('dye-ai-hint').hidden = false;
-    $('dye-ai-result').hidden = true;
     $('style-reuse').hidden = false;
     if (!gen.photo) $('gen-reuse').hidden = false;
     renderDye();
@@ -131,14 +130,40 @@ async function onDyeFile(file) {
 
 $('dye-file').onchange = (e) => onDyeFile(e.target.files[0]);
 
-// AI 真實染髮：交畀 Gemini 好似真染咁重畫
-$('dye-ai').onclick = async () => {
-  if (!state.photo) return;
+// AI 真實染髮：即時預覽之後自動交畀 Gemini 重畫 結果直接放入前後對比
+// 每隻色＋底色只畫一次（記住結果） 唔會撳一次色就收一次費
+const dyeCache = new Map();
+let dyeTimer = null, dyeToken = 0;
+const dyeKey = () => `${state.colour.id}:${state.base}`;
+
+function showDyeUrl(url) {
+  const img = new Image();
+  img.onload = () => $('dye-after').getContext('2d').drawImage(img, 0, 0, $('dye-after').width, $('dye-after').height);
+  img.src = url;
+}
+
+function scheduleDyeAI() {
+  clearTimeout(dyeTimer);
+  if (!state.photo || !state.mask) return;
+  const hit = dyeCache.get(dyeKey());
+  if (hit) {
+    showDyeUrl(hit);
+    status($('dye-ai-status'), '✨ AI 真實染髮效果');
+    return;
+  }
+  status($('dye-ai-status'), '⏳ 而家見到嘅係即時預覽 AI 正在幫你真實染緊 大約 10 至 30 秒…');
+  dyeTimer = setTimeout(() => runDyeAI(), 900);
+}
+
+async function runDyeAI(force = false) {
+  if (!state.photo || !state.mask) return;
+  const key = dyeKey();
+  if (!force && dyeCache.has(key)) return showDyeUrl(dyeCache.get(key));
+  const token = ++dyeToken;
   const st = $('dye-ai-status');
   const colour = state.colour;
   $('dye-ai').disabled = true;
-  $('dye-ai-result').hidden = true;
-  status(st, `⏳ AI 正在幫你染「${colour.name}」 大約要 10 至 30 秒…`);
+  status(st, `⏳ 而家見到嘅係即時預覽 AI 正在幫你真實染「${colour.name}」 大約 10 至 30 秒…`);
   try {
     const res = await fetch('api/preview', {
       method: 'POST',
@@ -147,34 +172,33 @@ $('dye-ai').onclick = async () => {
     });
     let data = {};
     try { data = await res.json(); } catch { /* 靜態網站冇伺服器 */ }
+    if (token !== dyeToken) return;
     if (!res.ok || !data.image) {
-      status(st, data.error || 'AI 真實染髮暫時未開放 可以先睇上面嘅即時預覽。');
+      status(st, data.error || 'AI 真實染髮暫時未開放 而家顯示嘅係即時預覽。');
       return;
     }
-    // 只用 AI 畫嘅頭髮 其他保持原相 避免 AI 改咗塊面或者眼鏡
-    let url = data.image;
-    if (state.mask) {
-      const img = new Image();
-      img.src = data.image;
-      await img.decode();
-      const c = document.createElement('canvas');
-      c.width = state.original.width; c.height = state.original.height;
-      c.getContext('2d').putImageData(compositeHair(state.original, img, state.mask), 0, 0);
-      url = c.toDataURL('image/jpeg', 0.92);
-    }
-    $('dye-ai-img').src = url;
-    $('dye-ai-save').href = url;
-    $('dye-ai-save').download = `fion-${colour.name}-AI.jpg`;
-    $('dye-ai-result').hidden = false;
-    status(st, '');
-    $('dye-ai-result').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // 只用 AI 嘅髮色同光暗 塊面 眼鏡 髮絲用返原相
+    const img = new Image();
+    img.src = data.image;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = state.original.width; c.height = state.original.height;
+    c.getContext('2d').putImageData(compositeHair(state.original, img, state.mask), 0, 0);
+    const url = c.toDataURL('image/jpeg', 0.92);
+    dyeCache.set(key, url);
+    if (token !== dyeToken || dyeKey() !== key) return;
+    showDyeUrl(url);
+    status(st, '✨ AI 真實染髮效果 拉中間條線可以對比染前染後');
   } catch (e) {
     console.error(e);
-    status(st, '網絡有問題 請再試一次。');
+    if (token === dyeToken) status(st, '網絡有問題 而家顯示嘅係即時預覽 可以撳下面再試。');
   } finally {
-    $('dye-ai').disabled = false;
+    if (token === dyeToken) $('dye-ai').disabled = false;
   }
-};
+}
+
+$('dye-ai').onclick = () => runDyeAI(true);
+
 $('dye-change').onclick = () => $('dye-file').click();
 $('dye-slider').oninput = (e) => {
   const v = e.target.value;
