@@ -289,6 +289,7 @@ const EYES = [
   [33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7],
   [263, 466, 388, 387, 386, 385, 384, 398, 362, 382, 381, 380, 374, 373, 390, 249],
 ];
+const LIPS = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146];
 const FACE_CORE = [127, 234, 93, 132, 58, 172, 136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397, 288, 361, 323, 454, 356, 300, 293, 334, 296, 336, 107, 66, 105, 63, 70];
 
 // Delaunay 三角剖分（Bowyer–Watson） 回傳三角形嘅頂點編號
@@ -348,6 +349,32 @@ function warpTris(img, src, dst, ctx) {
   }
 }
 
+// 瀏海垂落塊面嘅幼髮絲：比附近皮膚暗嘅細線 （避開眼 鼻孔 嘴唇呢啲本身暗嘅位）
+function strandMask(canvas, pa, w, h) {
+  const d = canvas.getContext('2d').getImageData(0, 0, w, h).data;
+  const L = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) L[i] = rgbToLab(d[i * 4], d[i * 4 + 1], d[i * 4 + 2])[0];
+  const faceW = dist(pa[234], pa[454], w, h);
+  const local = boxBlur(L, w, h, Math.max(3, Math.round(faceW / 40)));
+  const face = faceCoreMask(pa, w, h, FACE_CORE, 0.95);
+  const skip = [faceCoreMask(pa, w, h, LIPS, 1.25), ...EYES.map((e) => faceCoreMask(pa, w, h, e, 1.5))];
+  const nose = [98, 327, 2].map((k) => [pa[k].x * w, pa[k].y * h]);
+  const rn = faceW * 0.09;
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (face[i] < 0.5 || skip.some((q) => q[i] > 0.05)) continue;
+      if (nose.some(([nx, ny]) => Math.hypot(x - nx, y - ny) < rn)) continue;
+      out[i] = smooth(4, 9, local[i] - L[i]);
+    }
+  }
+  // 放闊少少 連髮絲邊都蓋埋
+  const b = boxBlur(out, w, h, Math.max(2, Math.round(faceW / 60)));
+  for (let i = 0; i < w * h; i++) b[i] = Math.min(1, b[i] * 4);
+  return b;
+}
+
 // AI 打側咗個頭：用 AI 圖做底（新髮型 頭型 背景都啱晒） 再將客人自己嘅眼 鼻 口
 // 按 AI 塊面嘅角度逐點貼返上去 顏色光暗跟返 AI 圖 咁就唔會有雙重頭髮或者鬼影
 async function swapFace(origCanvas, raw, pa, pr, w, h) {
@@ -360,6 +387,8 @@ async function swapFace(origCanvas, raw, pa, pr, w, h) {
   warpTris(origCanvas, keys.map((k) => P(pa, k)), keys.map((k) => P(pr, k)), fctx);
   // 原相嘅頭髮遮罩都拉去 AI 塊面位置 （幼髮絲 分割模型未必捉到 所以再放闊）
   const ma = await hairMask(origCanvas);
+  const strands = strandMask(origCanvas, pa, w, h);
+  for (let i = 0; i < w * h; i++) ma.data[i] = Math.max(ma.data[i], strands[i]);
   const mc = document.createElement('canvas');
   mc.width = w; mc.height = h;
   const mctx = mc.getContext('2d');
