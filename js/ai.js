@@ -405,7 +405,7 @@ async function swapFace(origCanvas, raw, pa, pr, w, h) {
   const hm = await hairMask(fc);
   const hair0 = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) hair0[i] = Math.max(mwd[i * 4] / 255, hm.data[i]);
-  const hair = boxBlur(hair0, w, h, Math.max(3, Math.round(Math.min(w, h) / 50)));
+  const hair = boxBlur(boxBlur(hair0, w, h, Math.max(3, Math.round(Math.min(w, h) / 60))), w, h, Math.max(3, Math.round(Math.min(w, h) / 60)));
   // 鼻 口 面頰 下巴一定用客人自己；眼睛冇瀏海遮先貼 有遮就用 AI 畫嘅眼
   const lower = faceCoreMask(pr, w, h, LOWER_FACE, 0.92);
   const parts = [lower];
@@ -419,7 +419,7 @@ async function swapFace(origCanvas, raw, pa, pr, w, h) {
   for (let i = 0; i < w * h; i++) {
     let v = 0;
     for (const q of parts) v = Math.max(v, q[i]);
-    m[i] = smooth(0.3, 0.9, v) * (1 - smooth(0.04, 0.25, hair[i]));
+    m[i] = smooth(0.3, 0.9, v) * (1 - smooth(0.03, 0.4, hair[i]));
   }
   const o = raw.getContext('2d').getImageData(0, 0, w, h);
   const f = fctx.getImageData(0, 0, w, h);
