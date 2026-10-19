@@ -431,38 +431,46 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
   const [ma, mb] = [await hairMask(origCanvas), await hairMask(gc)];
   const union = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) union[i] = Math.max(ma.data[i], mb.data[i]);
-  const grown = boxBlur(union, w, h, Math.max(3, Math.round(Math.min(w, h) / 60)));
-  const core = aligned ? null : faceCoreMask(pa, w, h);
+  const gr = Math.max(3, Math.round(Math.min(w, h) / 60));
+  const grown = boxBlur(union, w, h, gr);
+  // 舊頭髮（例如蔭）要剪走嘅位 再闊少少 唔好留低髮尾邊
+  const oldHair = boxBlur(ma.data, w, h, gr * 2);
+  const core = faceCoreMask(pa, w, h);
   const o = origCanvas.getContext('2d').getImageData(0, 0, w, h);
   const g = gctx.getImageData(0, 0, w, h);
   let diff = 0, cnt = 0;
-  // 頭髮範圍外圍一圈 用嚟校正 AI 圖嘅膚色同光暗 避免舊頭髮位出現色差
-  const off = [0, 0, 0];
-  let ring = 0;
   const alpha = new Float32Array(w * h);
+  // 局部色差：喺 AI 圖同原相都唔係頭髮嘅位（主要係塊面皮膚）量度色差 再向外擴散
+  // 咁新露出嚟嘅額頭 鬢角就會跟返客人自己嘅膚色同光暗
+  const wt = new Float32Array(w * h);
+  const dch = [0, 1, 2].map(() => new Float32Array(w * h));
   for (let i = 0; i < w * h; i++) {
-    alpha[i] = smooth(0.03, 0.5, grown[i]);
+    alpha[i] = Math.max(smooth(0.03, 0.5, grown[i]), smooth(0.02, 0.25, oldHair[i]));
     // 拉過位嘅 AI 圖 塊面一律用返客人自己
-    if (core) alpha[i] *= 1 - smooth(0.3, 0.9, core[i]);
+    if (!aligned) alpha[i] *= 1 - smooth(0.3, 0.9, core[i]);
     const j = i * 4;
     if (alpha[i] === 0 && i % 7 === 0) {
       diff += Math.abs(o.data[j] - g.data[j]) + Math.abs(o.data[j + 1] - g.data[j + 1]) + Math.abs(o.data[j + 2] - g.data[j + 2]);
       cnt++;
     }
-    if (grown[i] > 0.005 && grown[i] < 0.06) {
-      for (let k = 0; k < 3; k++) off[k] += o.data[j + k] - g.data[j + k];
-      ring++;
+    if (alpha[i] < 0.01) {
+      wt[i] = 0.05 + core[i];
+      for (let k = 0; k < 3; k++) dch[k][i] = (o.data[j + k] - g.data[j + k]) * wt[i];
     }
   }
   if (aligned && (!cnt || diff / cnt / 3 > 20)) return null;
-  if (ring) for (let k = 0; k < 3; k++) off[k] = Math.max(-40, Math.min(40, off[k] / ring));
+  const R = Math.max(4, Math.round(Math.min(w, h) / 10));
+  const blur2 = (a) => boxBlur(boxBlur(a, w, h, R), w, h, R);
+  const wb = blur2(wt);
+  const off = dch.map(blur2);
   for (let i = 0; i < w * h; i++) {
     const a = alpha[i];
     if (!a) continue;
     // 新頭髮保持 AI 原色 其餘（皮膚 背景）校正色差
     const fix = 1 - smooth(0.2, 0.7, mb.data[i]);
     for (let k = 0; k < 3; k++) {
-      const gv = g.data[i * 4 + k] + off[k] * fix;
+      const d = wb[i] > 1e-4 ? Math.max(-60, Math.min(60, off[k][i] / wb[i])) : 0;
+      const gv = g.data[i * 4 + k] + d * fix;
       o.data[i * 4 + k] = o.data[i * 4 + k] * (1 - a) + gv * a;
     }
   }
