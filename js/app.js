@@ -392,6 +392,22 @@ $('gen-go').onclick = async () => {
   $('gen-result').hidden = true;
   status(st, `⏳ AI 正在為你生成「${style.name}」效果圖 大約要 10 至 30 秒…`);
   try {
+    // 相片四邊加啲模糊留白 AI 就唔會為咗「放得落新髮型」而拉遠鏡頭 收到之後再裁返
+    const pad = Math.round(Math.max(gen.photo.width, gen.photo.height) * 0.15);
+    const padded = document.createElement('canvas');
+    padded.width = gen.photo.width + pad * 2; padded.height = gen.photo.height + pad * 2;
+    const pctx = padded.getContext('2d');
+    pctx.filter = 'blur(24px)';
+    pctx.drawImage(gen.photo, 0, 0, padded.width, padded.height);
+    pctx.filter = 'none';
+    pctx.drawImage(gen.photo, pad, pad);
+    const unpad = (img) => {
+      const c = document.createElement('canvas');
+      c.width = gen.photo.width; c.height = gen.photo.height;
+      const kx = img.naturalWidth / padded.width, ky = img.naturalHeight / padded.height;
+      c.getContext('2d').drawImage(img, pad * kx, pad * ky, gen.photo.width * kx, gen.photo.height * ky, 0, 0, c.width, c.height);
+      return c;
+    };
     // AI 有時會成張相重新構圖（郁咗個人） 對唔齊就自動再試 最多三次
     let url = null;
     for (let attempt = 1; attempt <= 3 && !url; attempt++) {
@@ -400,7 +416,7 @@ $('gen-go').onclick = async () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          image: gen.photo.toDataURL('image/jpeg', 0.9),
+          image: padded.toDataURL('image/jpeg', 0.9),
           styleId: gen.styleId,
           colourId: $('gen-colour').checked ? state.colour.id : null,
         }),
@@ -416,7 +432,8 @@ $('gen-go').onclick = async () => {
         const img = new Image();
         img.src = data.image;
         await img.decode();
-        const mixed = await compositeRestyle(gen.photo, img);
+        const cropped = unpad(img);
+        const mixed = await compositeRestyle(gen.photo, cropped);
         if (mixed) {
           const c = document.createElement('canvas');
           c.width = mixed.width; c.height = mixed.height;
@@ -424,7 +441,12 @@ $('gen-go').onclick = async () => {
           url = c.toDataURL('image/jpeg', 0.92);
         }
       } catch (e) { console.error(e); }
-      if (!url && attempt === 3) url = data.image;
+      if (!url && attempt === 3) {
+        const img = new Image();
+        img.src = data.image;
+        await img.decode();
+        url = unpad(img).toDataURL('image/jpeg', 0.92);
+      }
     }
     $('gen-img').src = url;
     $('gen-save').href = url;

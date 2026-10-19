@@ -283,18 +283,36 @@ export function compositeHair(imageData, genImage, mask) {
 // AI 如果將成張相重新構圖 就對唔齊 嗰陣直接用 AI 原圖
 export async function compositeRestyle(origCanvas, genImage) {
   const w = origCanvas.width, h = origCanvas.height;
+  const raw = document.createElement('canvas');
+  raw.width = w; raw.height = h;
+  raw.getContext('2d').drawImage(genImage, 0, 0, w, h);
+  // 對位：用兩邊眼角計 AI 圖有冇放大 縮細 移位 或者打側 再校返正
+  const lm = await landmarker();
+  const pa = lm.detect(origCanvas).faceLandmarks?.[0];
+  const pr = lm.detect(raw).faceLandmarks?.[0];
+  if (!pa || !pr) return null;
+  const P = (q, k) => [q[k].x * w, q[k].y * h];
+  const [a1, a2, b1, b2] = [P(pa, 33), P(pa, 263), P(pr, 33), P(pr, 263)];
+  const va = [a2[0] - a1[0], a2[1] - a1[1]], vb = [b2[0] - b1[0], b2[1] - b1[1]];
+  const sc = Math.hypot(...va) / Math.hypot(...vb);
+  const ang = Math.atan2(va[1], va[0]) - Math.atan2(vb[1], vb[0]);
+  if (sc < 0.75 || sc > 1.35 || Math.abs(ang) > 0.25) return null;
   const gc = document.createElement('canvas');
   gc.width = w; gc.height = h;
   const gctx = gc.getContext('2d');
-  gctx.drawImage(genImage, 0, 0, w, h);
-  // 對位檢查：兩張相嘅眼角同鼻尖位置要差唔多 否則 AI 已經移過個人
-  const lm = await landmarker();
-  const pa = lm.detect(origCanvas).faceLandmarks?.[0];
+  gctx.drawImage(origCanvas, 0, 0);
+  gctx.translate(a1[0], a1[1]);
+  gctx.rotate(ang);
+  gctx.scale(sc, sc);
+  gctx.translate(-b1[0], -b1[1]);
+  gctx.drawImage(raw, 0, 0);
+  gctx.setTransform(1, 0, 0, 1, 0, 0);
+  // 校正之後 鼻尖同下巴都要對得返 （打側太多就對唔到）
   const pb = lm.detect(gc).faceLandmarks?.[0];
-  if (!pa || !pb) return null;
+  if (!pb) return null;
   const faceW = dist(pa[234], pa[454], w, h);
   const shift = Math.max(...[33, 263, 1, 152].map((k) => dist(pa[k], pb[k], w, h)));
-  if (shift > faceW * 0.04) return null;
+  if (shift > faceW * 0.06) return null;
   const [ma, mb] = [await hairMask(origCanvas), await hairMask(gc)];
   const union = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) union[i] = Math.max(ma.data[i], mb.data[i]);

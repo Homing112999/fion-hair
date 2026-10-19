@@ -16,7 +16,7 @@ export function buildPrompt(style, colour) {
   // 「同一個髮型」嗰類（例如挑染 曲髮）唔使剪 其他就要明顯換髮型
   const keepCut = /^(the same hairstyle|hair )/.test(style.genPrompt);
   return [
-    'Keep the exact same photo: same framing, crop, zoom, people, pose, head angle and gaze.',
+    'Keep the exact same photo: same framing, crop, zoom, people and pose. The head angle, face direction and eye gaze must stay exactly as in the original; do not turn or tilt the head.',
     keepCut ? `Restyle the hair of the person in this photo: ${hair}.` : `Give the person in this photo a completely new haircut: ${hair}.`,
     keepCut
       ? 'The change must be clearly visible and match the description exactly, not a filter, tint or lighting tweak.'
