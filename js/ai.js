@@ -279,14 +279,124 @@ export function compositeHair(imageData, genImage, mask) {
   return out;
 }
 
+// 臉型輪廓 + 眼 鼻 口 嘅特徵點（MediaPipe face mesh 編號）
+const OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
+const INNER = [33, 133, 362, 263, 1, 61, 291, 168, 6, 199, 105, 334];
+// 眉毛以下嘅塊面（換髮型唔准郁）：右邊輪廓落到下巴再上返左邊 然後沿眉毛返嚟
+const FACE_CORE = [127, 234, 93, 132, 58, 172, 136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397, 288, 361, 323, 454, 356, 300, 293, 334, 296, 336, 107, 66, 105, 63, 70];
+
+// Delaunay 三角剖分（Bowyer–Watson） 回傳三角形嘅頂點編號
+function delaunay(pts) {
+  const n = pts.length;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of pts) { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); }
+  const d = Math.max(maxX - minX, maxY - minY) * 20;
+  const all = [...pts, [minX - d, minY - d], [minX + d * 2, minY - d], [minX - d, minY + d * 2]];
+  const circ = (t) => {
+    const [ax, ay] = all[t[0]], [bx, by] = all[t[1]], [cx, cy] = all[t[2]];
+    const D = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+    const ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / D;
+    const uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / D;
+    return { t, ux, uy, r2: (ax - ux) ** 2 + (ay - uy) ** 2 };
+  };
+  let tris = [circ([n, n + 1, n + 2])];
+  for (let i = 0; i < n; i++) {
+    const [px, py] = all[i];
+    const bad = [], keep = [];
+    for (const c of tris) ((px - c.ux) ** 2 + (py - c.uy) ** 2 < c.r2 ? bad : keep).push(c);
+    const edges = new Map();
+    for (const { t } of bad) {
+      for (const [a, b] of [[t[0], t[1]], [t[1], t[2]], [t[2], t[0]]]) {
+        const k = a < b ? `${a},${b}` : `${b},${a}`;
+        edges.set(k, edges.has(k) ? null : [a, b]);
+      }
+    }
+    for (const e of edges.values()) if (e) keep.push(circ([e[0], e[1], i]));
+    tris = keep;
+  }
+  return tris.map((c) => c.t).filter((t) => t.every((k) => k < n));
+}
+
+// AI 打側咗個頭都唔緊要：用塊面特徵點將 AI 圖逐個三角形拉返去原相嘅位置
+function warpToFace(raw, pa, pr, w, h, ctx) {
+  const P = (q, k) => [q[k].x * w, q[k].y * h];
+  const centre = (q) => {
+    let x = 0, y = 0;
+    for (const k of OVAL) { x += q[k].x * w; y += q[k].y * h; }
+    return [x / OVAL.length, y / OVAL.length];
+  };
+  const [ca, cr] = [centre(pa), centre(pr)];
+  const dst = [], src = [];
+  for (const k of [...OVAL, ...INNER]) { dst.push(P(pa, k)); src.push(P(pr, k)); }
+  // 塊面外面幾圈（頭髮 頸）跟住塊面一齊郁
+  for (const s of [1.3, 1.7, 2.3]) {
+    for (const k of OVAL) {
+      const a = P(pa, k), r = P(pr, k);
+      const da = [ca[0] + (a[0] - ca[0]) * s, ca[1] + (a[1] - ca[1]) * s];
+      if (da[0] < -0.4 * w || da[0] > 1.4 * w || da[1] < -0.4 * h || da[1] > 1.4 * h) continue;
+      dst.push(da);
+      src.push([cr[0] + (r[0] - cr[0]) * s, cr[1] + (r[1] - cr[1]) * s]);
+    }
+  }
+  // 相嘅外框唔郁
+  for (const fx of [-0.5, 0, 0.5, 1, 1.5]) {
+    for (const fy of [-0.5, 0, 0.5, 1, 1.5]) {
+      if (fx > -0.5 && fx < 1.5 && fy > -0.5 && fy < 1.5) continue;
+      dst.push([fx * w, fy * h]); src.push([fx * w, fy * h]);
+    }
+  }
+  for (const t of delaunay(dst)) {
+    const [[u0, v0], [u1, v1], [u2, v2]] = t.map((k) => dst[k]);
+    const [[x0, y0], [x1, y1], [x2, y2]] = t.map((k) => src[k]);
+    const den = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
+    if (Math.abs(den) < 1e-6) continue;
+    const a = ((u1 - u0) * (y2 - y0) - (u2 - u0) * (y1 - y0)) / den;
+    const c = ((u2 - u0) * (x1 - x0) - (u1 - u0) * (x2 - x0)) / den;
+    const b = ((v1 - v0) * (y2 - y0) - (v2 - v0) * (y1 - y0)) / den;
+    const d = ((v2 - v0) * (x1 - x0) - (v1 - v0) * (x2 - x0)) / den;
+    // 三角形放大一點點 避免接駁位出白線
+    const mx = (u0 + u1 + u2) / 3, my = (v0 + v1 + v2) / 3;
+    const grow = ([u, v]) => { const l = Math.hypot(u - mx, v - my) || 1; return [u + (u - mx) / l, v + (v - my) / l]; };
+    ctx.save();
+    ctx.beginPath();
+    [[u0, v0], [u1, v1], [u2, v2]].map(grow).forEach(([u, v], i) => (i ? ctx.lineTo(u, v) : ctx.moveTo(u, v)));
+    ctx.closePath();
+    ctx.clip();
+    ctx.setTransform(a, b, c, d, u0 - a * x0 - c * y0, v0 - b * x0 - d * y0);
+    ctx.drawImage(raw, 0, 0);
+    ctx.restore();
+  }
+}
+
+// 原相塊面（眉毛以下）嘅遮罩 0 至 1
+function faceCoreMask(pa, w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  let mx = 0, my = 0;
+  for (const k of FACE_CORE) { mx += pa[k].x * w; my += pa[k].y * h; }
+  mx /= FACE_CORE.length; my /= FACE_CORE.length;
+  ctx.beginPath();
+  FACE_CORE.forEach((k, i) => {
+    // 縮入少少 留返位畀鬢角同兩邊頭髮
+    const x = mx + (pa[k].x * w - mx) * 0.9, y = my + (pa[k].y * h - my) * 0.9;
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  });
+  ctx.closePath();
+  ctx.fill();
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const m = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) m[i] = d[i * 4 + 3] / 255;
+  return boxBlur(m, w, h, Math.max(2, Math.round(Math.min(w, h) / 70)));
+}
+
 // AI 效果圖：新舊頭髮範圍（再放大少少）用 AI 圖 其他（塊面 眼鏡 衫 背景）用返原相
-// AI 如果將成張相重新構圖 就對唔齊 嗰陣直接用 AI 原圖
-export async function compositeRestyle(origCanvas, genImage, tol = 0.06) {
+// 先試簡單對位（放大 縮細 轉角度）； warp = true 時 AI 打側咗個頭都會逐點拉返去客人塊面度
+export async function compositeRestyle(origCanvas, genImage, { warp = false } = {}) {
   const w = origCanvas.width, h = origCanvas.height;
   const raw = document.createElement('canvas');
   raw.width = w; raw.height = h;
   raw.getContext('2d').drawImage(genImage, 0, 0, w, h);
-  // 對位：用兩邊眼角計 AI 圖有冇放大 縮細 移位 或者打側 再校返正
   const lm = await landmarker();
   const pa = lm.detect(origCanvas).faceLandmarks?.[0];
   const pr = lm.detect(raw).faceLandmarks?.[0];
@@ -296,27 +406,33 @@ export async function compositeRestyle(origCanvas, genImage, tol = 0.06) {
   const va = [a2[0] - a1[0], a2[1] - a1[1]], vb = [b2[0] - b1[0], b2[1] - b1[1]];
   const sc = Math.hypot(...va) / Math.hypot(...vb);
   const ang = Math.atan2(va[1], va[0]) - Math.atan2(vb[1], vb[0]);
-  if (sc < 0.75 || sc > 1.35 || Math.abs(ang) > 0.25) return null;
   const gc = document.createElement('canvas');
   gc.width = w; gc.height = h;
   const gctx = gc.getContext('2d');
   gctx.drawImage(origCanvas, 0, 0);
-  gctx.translate(a1[0], a1[1]);
-  gctx.rotate(ang);
-  gctx.scale(sc, sc);
-  gctx.translate(-b1[0], -b1[1]);
-  gctx.drawImage(raw, 0, 0);
-  gctx.setTransform(1, 0, 0, 1, 0, 0);
-  // 校正之後 鼻尖同下巴都要對得返 （打側太多就對唔到）
-  const pb = lm.detect(gc).faceLandmarks?.[0];
-  if (!pb) return null;
-  const faceW = dist(pa[234], pa[454], w, h);
-  const shift = Math.max(...[33, 263, 1, 152].map((k) => dist(pa[k], pb[k], w, h)));
-  if (shift > faceW * tol) return null;
+  let aligned = false;
+  if (sc >= 0.75 && sc <= 1.35 && Math.abs(ang) <= 0.25) {
+    gctx.translate(a1[0], a1[1]);
+    gctx.rotate(ang);
+    gctx.scale(sc, sc);
+    gctx.translate(-b1[0], -b1[1]);
+    gctx.drawImage(raw, 0, 0);
+    gctx.setTransform(1, 0, 0, 1, 0, 0);
+    // 校正之後 鼻尖同下巴都要對得返 （打側太多就對唔到）
+    const pb = lm.detect(gc).faceLandmarks?.[0];
+    const faceW = dist(pa[234], pa[454], w, h);
+    aligned = !!pb && Math.max(...[33, 263, 1, 152].map((k) => dist(pa[k], pb[k], w, h))) <= faceW * 0.06;
+  }
+  if (!aligned) {
+    if (!warp || sc < 0.5 || sc > 2 || Math.abs(ang) > 0.6) return null;
+    gctx.drawImage(origCanvas, 0, 0);
+    warpToFace(raw, pa, pr, w, h, gctx);
+  }
   const [ma, mb] = [await hairMask(origCanvas), await hairMask(gc)];
   const union = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) union[i] = Math.max(ma.data[i], mb.data[i]);
   const grown = boxBlur(union, w, h, Math.max(3, Math.round(Math.min(w, h) / 60)));
+  const core = aligned ? null : faceCoreMask(pa, w, h);
   const o = origCanvas.getContext('2d').getImageData(0, 0, w, h);
   const g = gctx.getImageData(0, 0, w, h);
   let diff = 0, cnt = 0;
@@ -326,6 +442,8 @@ export async function compositeRestyle(origCanvas, genImage, tol = 0.06) {
   const alpha = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) {
     alpha[i] = smooth(0.03, 0.5, grown[i]);
+    // 拉過位嘅 AI 圖 塊面一律用返客人自己
+    if (core) alpha[i] *= 1 - smooth(0.3, 0.9, core[i]);
     const j = i * 4;
     if (alpha[i] === 0 && i % 7 === 0) {
       diff += Math.abs(o.data[j] - g.data[j]) + Math.abs(o.data[j + 1] - g.data[j + 1]) + Math.abs(o.data[j + 2] - g.data[j + 2]);
@@ -336,7 +454,7 @@ export async function compositeRestyle(origCanvas, genImage, tol = 0.06) {
       ring++;
     }
   }
-  if (!cnt || diff / cnt / 3 > 20) return null;
+  if (aligned && (!cnt || diff / cnt / 3 > 20)) return null;
   if (ring) for (let k = 0; k < 3; k++) off[k] = Math.max(-40, Math.min(40, off[k] / ring));
   for (let i = 0; i < w * h; i++) {
     const a = alpha[i];

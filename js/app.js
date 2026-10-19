@@ -433,8 +433,8 @@ $('gen-go').onclick = async () => {
         img.src = data.image;
         await img.decode();
         const cropped = unpad(img);
-        // 最後一次放寬少少 盡量用返客人自己塊面
-        const mixed = await compositeRestyle(gen.photo, cropped, attempt === 3 ? 0.1 : 0.06);
+        // 第一次要求 AI 張圖本身對得齊；之後 AI 打側咗個頭都逐點拉返去客人塊面度
+        const mixed = await compositeRestyle(gen.photo, cropped, { warp: attempt > 1 });
         if (mixed) {
           const c = document.createElement('canvas');
           c.width = mixed.width; c.height = mixed.height;
