@@ -283,6 +283,12 @@ export function compositeHair(imageData, genImage, mask) {
 const OVAL = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109];
 const INNER = [33, 133, 362, 263, 1, 61, 291, 168, 6, 199, 105, 334];
 // 眉毛以下嘅塊面（換髮型唔准郁）：右邊輪廓落到下巴再上返左邊 然後沿眉毛返嚟
+// 眼以下嘅塊面（鼻 口 面頰 下巴）：沿下眼皮同鼻樑過
+const LOWER_FACE = [127, 234, 93, 132, 58, 172, 136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397, 288, 361, 323, 454, 356, 263, 249, 390, 373, 374, 380, 381, 382, 362, 168, 133, 155, 154, 153, 145, 144, 163, 7, 33];
+const EYES = [
+  [33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7],
+  [263, 466, 388, 387, 386, 385, 384, 398, 362, 382, 381, 380, 374, 373, 390, 249],
+];
 const FACE_CORE = [127, 234, 93, 132, 58, 172, 136, 150, 149, 176, 148, 152, 377, 400, 378, 379, 365, 397, 288, 361, 323, 454, 356, 300, 293, 334, 296, 336, 107, 66, 105, 63, 70];
 
 // Delaunay 三角剖分（Bowyer–Watson） 回傳三角形嘅頂點編號
@@ -352,11 +358,40 @@ async function swapFace(origCanvas, raw, pa, pr, w, h) {
   const fctx = fc.getContext('2d');
   fctx.drawImage(raw, 0, 0);
   warpTris(origCanvas, keys.map((k) => P(pa, k)), keys.map((k) => P(pr, k)), fctx);
-  const core = faceCoreMask(pr, w, h);
-  // 原相有瀏海遮住眼眉嘅位 唔好貼 用返 AI 圖
+  // 原相嘅頭髮遮罩都拉去 AI 塊面位置 （幼髮絲 分割模型未必捉到 所以再放闊）
+  const ma = await hairMask(origCanvas);
+  const mc = document.createElement('canvas');
+  mc.width = w; mc.height = h;
+  const mctx = mc.getContext('2d');
+  const md = mctx.createImageData(w, h);
+  for (let i = 0; i < w * h; i++) { const v = Math.round(ma.data[i] * 255); md.data.set([v, v, v, 255], i * 4); }
+  mctx.putImageData(md, 0, 0);
+  const mw = document.createElement('canvas');
+  mw.width = w; mw.height = h;
+  const mwctx = mw.getContext('2d');
+  mwctx.fillStyle = '#000';
+  mwctx.fillRect(0, 0, w, h);
+  warpTris(mc, keys.map((k) => P(pa, k)), keys.map((k) => P(pr, k)), mwctx);
+  const mwd = mwctx.getImageData(0, 0, w, h).data;
   const hm = await hairMask(fc);
+  const hair0 = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) hair0[i] = Math.max(mwd[i * 4] / 255, hm.data[i]);
+  const hair = boxBlur(hair0, w, h, Math.max(3, Math.round(Math.min(w, h) / 50)));
+  // 鼻 口 面頰 下巴一定用客人自己；眼睛冇瀏海遮先貼 有遮就用 AI 畫嘅眼
+  const lower = faceCoreMask(pr, w, h, LOWER_FACE, 0.92);
+  const parts = [lower];
+  for (const eye of EYES) {
+    const em = faceCoreMask(pr, w, h, eye, 1.6);
+    let s1 = 0, s0 = 0;
+    for (let i = 0; i < w * h; i++) if (em[i] > 0.5) { s1 += hair[i]; s0++; }
+    if (s0 && s1 / s0 < 0.04) parts.push(em);
+  }
   const m = new Float32Array(w * h);
-  for (let i = 0; i < w * h; i++) m[i] = smooth(0.3, 0.9, core[i]) * (1 - smooth(0.15, 0.5, hm.data[i]));
+  for (let i = 0; i < w * h; i++) {
+    let v = 0;
+    for (const q of parts) v = Math.max(v, q[i]);
+    m[i] = smooth(0.3, 0.9, v) * (1 - smooth(0.04, 0.25, hair[i]));
+  }
   const o = raw.getContext('2d').getImageData(0, 0, w, h);
   const f = fctx.getImageData(0, 0, w, h);
   // 低頻色差：貼上去嘅塊面跟返 AI 圖附近嘅膚色同光暗 接口唔會見到
@@ -381,17 +416,17 @@ async function swapFace(origCanvas, raw, pa, pr, w, h) {
 }
 
 // 原相塊面（眉毛以下）嘅遮罩 0 至 1
-function faceCoreMask(pa, w, h) {
+function faceCoreMask(pa, w, h, poly = FACE_CORE, scale = 0.9) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const ctx = c.getContext('2d');
   let mx = 0, my = 0;
-  for (const k of FACE_CORE) { mx += pa[k].x * w; my += pa[k].y * h; }
-  mx /= FACE_CORE.length; my /= FACE_CORE.length;
+  for (const k of poly) { mx += pa[k].x * w; my += pa[k].y * h; }
+  mx /= poly.length; my /= poly.length;
   ctx.beginPath();
-  FACE_CORE.forEach((k, i) => {
+  poly.forEach((k, i) => {
     // 縮入少少 留返位畀鬢角同兩邊頭髮
-    const x = mx + (pa[k].x * w - mx) * 0.9, y = my + (pa[k].y * h - my) * 0.9;
+    const x = mx + (pa[k].x * w - mx) * scale, y = my + (pa[k].y * h - my) * scale;
     i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
   });
   ctx.closePath();
