@@ -317,34 +317,8 @@ function delaunay(pts) {
   return tris.map((c) => c.t).filter((t) => t.every((k) => k < n));
 }
 
-// AI 打側咗個頭都唔緊要：用塊面特徵點將 AI 圖逐個三角形拉返去原相嘅位置
-function warpToFace(raw, pa, pr, w, h, ctx) {
-  const P = (q, k) => [q[k].x * w, q[k].y * h];
-  const centre = (q) => {
-    let x = 0, y = 0;
-    for (const k of OVAL) { x += q[k].x * w; y += q[k].y * h; }
-    return [x / OVAL.length, y / OVAL.length];
-  };
-  const [ca, cr] = [centre(pa), centre(pr)];
-  const dst = [], src = [];
-  for (const k of [...OVAL, ...INNER]) { dst.push(P(pa, k)); src.push(P(pr, k)); }
-  // 塊面外面幾圈（頭髮 頸）跟住塊面一齊郁
-  for (const s of [1.3, 1.7, 2.3]) {
-    for (const k of OVAL) {
-      const a = P(pa, k), r = P(pr, k);
-      const da = [ca[0] + (a[0] - ca[0]) * s, ca[1] + (a[1] - ca[1]) * s];
-      if (da[0] < -0.4 * w || da[0] > 1.4 * w || da[1] < -0.4 * h || da[1] > 1.4 * h) continue;
-      dst.push(da);
-      src.push([cr[0] + (r[0] - cr[0]) * s, cr[1] + (r[1] - cr[1]) * s]);
-    }
-  }
-  // 相嘅外框唔郁
-  for (const fx of [-0.5, 0, 0.5, 1, 1.5]) {
-    for (const fy of [-0.5, 0, 0.5, 1, 1.5]) {
-      if (fx > -0.5 && fx < 1.5 && fy > -0.5 && fy < 1.5) continue;
-      dst.push([fx * w, fy * h]); src.push([fx * w, fy * h]);
-    }
-  }
+// 逐個三角形將 img 由 src 點拉去 dst 點（畫落 ctx）
+function warpTris(img, src, dst, ctx) {
   for (const t of delaunay(dst)) {
     const [[u0, v0], [u1, v1], [u2, v2]] = t.map((k) => dst[k]);
     const [[x0, y0], [x1, y1], [x2, y2]] = t.map((k) => src[k]);
@@ -363,9 +337,47 @@ function warpToFace(raw, pa, pr, w, h, ctx) {
     ctx.closePath();
     ctx.clip();
     ctx.setTransform(a, b, c, d, u0 - a * x0 - c * y0, v0 - b * x0 - d * y0);
-    ctx.drawImage(raw, 0, 0);
+    ctx.drawImage(img, 0, 0);
     ctx.restore();
   }
+}
+
+// AI 打側咗個頭：用 AI 圖做底（新髮型 頭型 背景都啱晒） 再將客人自己嘅眼 鼻 口
+// 按 AI 塊面嘅角度逐點貼返上去 顏色光暗跟返 AI 圖 咁就唔會有雙重頭髮或者鬼影
+async function swapFace(origCanvas, raw, pa, pr, w, h) {
+  const P = (q, k) => [q[k].x * w, q[k].y * h];
+  const keys = [...new Set([...FACE_CORE, ...INNER, 168, 6, 4, 0, 17, 13, 14, 159, 145, 386, 374])];
+  const fc = document.createElement('canvas');
+  fc.width = w; fc.height = h;
+  const fctx = fc.getContext('2d');
+  fctx.drawImage(raw, 0, 0);
+  warpTris(origCanvas, keys.map((k) => P(pa, k)), keys.map((k) => P(pr, k)), fctx);
+  const core = faceCoreMask(pr, w, h);
+  // 原相有瀏海遮住眼眉嘅位 唔好貼 用返 AI 圖
+  const hm = await hairMask(fc);
+  const m = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) m[i] = smooth(0.3, 0.9, core[i]) * (1 - smooth(0.15, 0.5, hm.data[i]));
+  const o = raw.getContext('2d').getImageData(0, 0, w, h);
+  const f = fctx.getImageData(0, 0, w, h);
+  // 低頻色差：貼上去嘅塊面跟返 AI 圖附近嘅膚色同光暗 接口唔會見到
+  const R = Math.max(4, Math.round(Math.min(w, h) / 25));
+  const blur2 = (a) => boxBlur(boxBlur(a, w, h, R), w, h, R);
+  const mb = blur2(m);
+  const ch = [0, 1, 2].map((k) => {
+    const ga = new Float32Array(w * h), fa = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) { ga[i] = o.data[i * 4 + k] * m[i]; fa[i] = f.data[i * 4 + k] * m[i]; }
+    return [blur2(ga), blur2(fa)];
+  });
+  for (let i = 0; i < w * h; i++) {
+    const a = m[i];
+    if (!a) continue;
+    for (let k = 0; k < 3; k++) {
+      const d = mb[i] > 1e-4 ? Math.max(-50, Math.min(50, (ch[k][0][i] - ch[k][1][i]) / mb[i])) : 0;
+      const fv = f.data[i * 4 + k] + d;
+      o.data[i * 4 + k] = o.data[i * 4 + k] * (1 - a) + fv * a;
+    }
+  }
+  return o;
 }
 
 // 原相塊面（眉毛以下）嘅遮罩 0 至 1
@@ -391,7 +403,7 @@ function faceCoreMask(pa, w, h) {
 }
 
 // AI 效果圖：新舊頭髮範圍（再放大少少）用 AI 圖 其他（塊面 眼鏡 衫 背景）用返原相
-// 先試簡單對位（放大 縮細 轉角度）； warp = true 時 AI 打側咗個頭都會逐點拉返去客人塊面度
+// 先試簡單對位（放大 縮細 轉角度）； warp = true 時 AI 打側咗個頭就用 AI 圖做底 貼返客人塊面
 export async function compositeRestyle(origCanvas, genImage, { warp = false } = {}) {
   const w = origCanvas.width, h = origCanvas.height;
   const raw = document.createElement('canvas');
@@ -425,8 +437,7 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
   }
   if (!aligned) {
     if (!warp || sc < 0.5 || sc > 2 || Math.abs(ang) > 0.6) return null;
-    gctx.drawImage(origCanvas, 0, 0);
-    warpToFace(raw, pa, pr, w, h, gctx);
+    return swapFace(origCanvas, raw, pa, pr, w, h);
   }
   const [ma, mb] = [await hairMask(origCanvas), await hairMask(gc)];
   const union = new Float32Array(w * h);
@@ -446,8 +457,6 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
   const dch = [0, 1, 2].map(() => new Float32Array(w * h));
   for (let i = 0; i < w * h; i++) {
     alpha[i] = Math.max(smooth(0.03, 0.5, grown[i]), smooth(0.02, 0.25, oldHair[i]));
-    // 拉過位嘅 AI 圖 塊面一律用返客人自己
-    if (!aligned) alpha[i] *= 1 - smooth(0.3, 0.9, core[i]);
     const j = i * 4;
     if (alpha[i] === 0 && i % 7 === 0) {
       diff += Math.abs(o.data[j] - g.data[j]) + Math.abs(o.data[j + 1] - g.data[j + 1]) + Math.abs(o.data[j + 2] - g.data[j + 2]);
@@ -458,7 +467,7 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
       for (let k = 0; k < 3; k++) dch[k][i] = (o.data[j + k] - g.data[j + k]) * wt[i];
     }
   }
-  if (aligned && (!cnt || diff / cnt / 3 > 20)) return null;
+  if (!cnt || diff / cnt / 3 > 20) return null;
   const R = Math.max(4, Math.round(Math.min(w, h) / 10));
   const blur2 = (a) => boxBlur(boxBlur(a, w, h, R), w, h, R);
   const wb = blur2(wt);
