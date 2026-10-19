@@ -281,7 +281,7 @@ export function compositeHair(imageData, genImage, mask) {
 
 // AI 效果圖：新舊頭髮範圍（再放大少少）用 AI 圖 其他（塊面 眼鏡 衫 背景）用返原相
 // AI 如果將成張相重新構圖 就對唔齊 嗰陣直接用 AI 原圖
-export async function compositeRestyle(origCanvas, genImage) {
+export async function compositeRestyle(origCanvas, genImage, tol = 0.06) {
   const w = origCanvas.width, h = origCanvas.height;
   const raw = document.createElement('canvas');
   raw.width = w; raw.height = h;
@@ -312,7 +312,7 @@ export async function compositeRestyle(origCanvas, genImage) {
   if (!pb) return null;
   const faceW = dist(pa[234], pa[454], w, h);
   const shift = Math.max(...[33, 263, 1, 152].map((k) => dist(pa[k], pb[k], w, h)));
-  if (shift > faceW * 0.06) return null;
+  if (shift > faceW * tol) return null;
   const [ma, mb] = [await hairMask(origCanvas), await hairMask(gc)];
   const union = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) union[i] = Math.max(ma.data[i], mb.data[i]);

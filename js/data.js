@@ -331,7 +331,7 @@ export const STYLES = [
       "wavy"
     ],
     "maintenance": "high",
-    "genPrompt": "a men's K-pop star style textured side-part hairstyle: short tapered sides, longer voluminous top swept up and to the side with airy texture and height, a few loose strands at the front, polished but effortless finish",
+    "genPrompt": "a men's textured side-part hairstyle: a clear deep side part on one side with the forehead exposed on that side, the top 6-8 cm long swept up and over to the opposite side with height, volume and piecey texture, short tapered sides and back, no fringe covering the forehead, polished but effortless finish",
     "gender": "men"
   },
   {

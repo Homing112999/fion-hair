@@ -22,7 +22,7 @@ export function buildPrompt(style, colour) {
       ? 'The change must be clearly visible and match the description exactly, not a filter, tint or lighting tweak.'
       : 'This must be an obvious salon transformation of the hair shape, length, fringe and layers that matches the description exactly, not a filter, tint or lighting tweak. Redraw the whole hair region from scratch.',
     keepCut ? '' : 'If the new style is longer than the current hair, add realistic new hair; if it is shorter, remove hair and fill in the neck, shoulders and background naturally.',
-    "Keep the person's face, identity, facial features, skin tone, expression, glasses, clothing, background and camera angle the same. Do not slim, reshape or beautify the face, do not change the glasses frames, do not add jewellery or accessories. Do not change the overall colour grading of the photo.",
+    "Keep the person's face, identity, facial features, skin tone, expression, clothing, background and camera angle the same. Do not slim, reshape or beautify the face. Keep any accessories exactly as they are in the photo and do not add any accessory that is not already there. Do not change the overall colour grading of the photo.",
     'The result must look like a real photo taken right after a professional salon visit. No text, no watermark.',
   ].filter(Boolean).join(' ');
 }
@@ -37,7 +37,7 @@ export function buildDyePrompt(colour, base) {
       ? 'The natural hair is dark and was not bleached, so the new colour should read subtly: richer and tinted in the light, deeper in the shadows, like real dye on dark Asian hair.'
       : 'Make the colour clearly visible but natural.',
     'This is a colour-only edit: only recolour the existing hair pixels. Do NOT change the haircut, length, parting, curl, waves or volume. Keep natural strand-level variation, shine, highlights and shadows, slightly deeper tone near the roots, and soft edges where hair meets skin and background.',
-    'Do NOT alter anything else: same face shape, identity, skin, eyebrows, makeup, glasses, jewellery, clothing, other people, background, lighting, framing and camera angle. No beautifying, no slimming. Output the same image size and composition. Photorealistic. No text, no watermark.',
+    'Do NOT alter anything else: same face shape, identity, skin, eyebrows, makeup, accessories (add none, remove none), clothing, other people, background, lighting, framing and camera angle. No beautifying, no slimming. Output the same image size and composition. Photorealistic. No text, no watermark.',
   ].join(' ');
 }
 

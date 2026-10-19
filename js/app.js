@@ -433,7 +433,8 @@ $('gen-go').onclick = async () => {
         img.src = data.image;
         await img.decode();
         const cropped = unpad(img);
-        const mixed = await compositeRestyle(gen.photo, cropped);
+        // 最後一次放寬少少 盡量用返客人自己塊面
+        const mixed = await compositeRestyle(gen.photo, cropped, attempt === 3 ? 0.1 : 0.06);
         if (mixed) {
           const c = document.createElement('canvas');
           c.width = mixed.width; c.height = mixed.height;
