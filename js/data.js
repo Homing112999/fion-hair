@@ -52,6 +52,7 @@ export const MAINTENANCE = {
 };
 
 // 熱門髮型（由舊網站搬過嚟）
+// gender: 'men' = 男士髮型（冇寫就係女士）
 // bestFor = 啱邊啲面型 bestTexture = 啱邊啲髮質 genPrompt = 將來 AI 效果圖用
 export const STYLES = [
   {
@@ -296,5 +297,149 @@ export const STYLES = [
     ],
     "maintenance": "low",
     "genPrompt": "a modern elongated pixie cut, longer nape and side pieces than a classic pixie, soft side-swept fringe sweeping across the forehead, textured feminine finish, effortlessly stylish"
+  },
+  {
+    "id": "american-crop",
+    "name": "美式前刺 American Crop",
+    "tagline": "清爽有型,男士頭號大熱",
+    "description": "兩邊同後面漸變推短,頂部留長少少用紋理剪,瀏海向前打碎。好易打理,一抹髮泥就有型,返工返學都啱。",
+    "bestFor": [
+      "oval",
+      "long",
+      "heart"
+    ],
+    "bestTexture": [
+      "straight",
+      "wavy"
+    ],
+    "maintenance": "low",
+    "genPrompt": "a men's American crop haircut: short skin fade on the sides and back, textured choppy top about 4-6 cm long pushed forward into a short blunt textured fringe, matte natural finish",
+    "gender": "men"
+  },
+  {
+    "id": "jackson-sidepart",
+    "name": "王嘉爾 feel 紋理側分",
+    "tagline": "明星型格感,有高度有層次",
+    "description": "參考王嘉爾嗰種型格造型:兩側較短,頂部留長吹高,側分帶紋理同空氣感,適合想有明星感、鐘意造型嘅男士。實際款式 Fion 會按你髮量同髮流調整。",
+    "bestFor": [
+      "oval",
+      "round",
+      "square"
+    ],
+    "bestTexture": [
+      "straight",
+      "wavy"
+    ],
+    "maintenance": "high",
+    "genPrompt": "a men's K-pop star style textured side-part hairstyle: short tapered sides, longer voluminous top swept up and to the side with airy texture and height, a few loose strands at the front, polished but effortless finish",
+    "gender": "men"
+  },
+  {
+    "id": "comma-hair",
+    "name": "韓系逗號頭",
+    "tagline": "溫柔韓系,修飾額頭",
+    "description": "瀏海一邊向內捲成逗號形狀,露出少少額頭,頂部蓬鬆有空氣感,韓國男團大熱,修飾臉型又顯斯文。",
+    "bestFor": [
+      "long",
+      "square",
+      "oval"
+    ],
+    "bestTexture": [
+      "straight",
+      "wavy"
+    ],
+    "maintenance": "medium",
+    "genPrompt": "a men's Korean comma hair style: medium-short hair with the fringe curled inward into a comma shape on one side revealing part of the forehead, soft volume on top, neatly tapered sides",
+    "gender": "men"
+  },
+  {
+    "id": "two-block",
+    "name": "韓式二分區 Two Block",
+    "tagline": "上長下短,清爽又有份量",
+    "description": "兩側同後腦剷短,頂部保留長度自然蓋落,形成上下分層,唔使點打理已經好整齊,適合頭髮較多較硬嘅男士。",
+    "bestFor": [
+      "round",
+      "oval",
+      "heart"
+    ],
+    "bestTexture": [
+      "straight",
+      "curly"
+    ],
+    "maintenance": "low",
+    "genPrompt": "a men's Korean two-block haircut: sides and back clipped short, longer top layer falling naturally over the sides with a soft forward fringe, clean neat finish",
+    "gender": "men"
+  },
+  {
+    "id": "textured-perm",
+    "name": "日系碎蓋紋理燙",
+    "tagline": "自然蓬鬆,睡醒都有型",
+    "description": "碎蓋瀏海配紋理燙,頭髮有自然捲度同空氣感,幼軟扁塌髮質都可以變得好有份量,早上用手抓兩抓就出門。",
+    "bestFor": [
+      "round",
+      "long",
+      "oval"
+    ],
+    "bestTexture": [
+      "straight",
+      "wavy"
+    ],
+    "maintenance": "low",
+    "genPrompt": "a men's Japanese textured perm hairstyle: medium-short hair with a soft messy fringe, loose natural curls and waves throughout the top, airy voluminous texture, tapered sides",
+    "gender": "men"
+  },
+  {
+    "id": "fade-slickback",
+    "name": "漸變油頭 Slick Back",
+    "tagline": "成熟紳士,商務必備",
+    "description": "兩側漸變推短,頂部頭髮向後梳順,用髮油整出光澤感,出席場合、返工見客都夠醒神。",
+    "bestFor": [
+      "oval",
+      "square",
+      "heart"
+    ],
+    "bestTexture": [
+      "straight",
+      "wavy"
+    ],
+    "maintenance": "high",
+    "genPrompt": "a men's slicked-back hairstyle with a fade: short faded sides, longer top combed straight back with a glossy pomade finish, clean sharp hairline, gentleman look",
+    "gender": "men"
+  },
+  {
+    "id": "mens-mullet",
+    "name": "男士狼尾 Mullet",
+    "tagline": "潮流個性,街頭感強",
+    "description": "前面同兩側較短,後頸位留長,配碎層次,好有街頭潮流感,適合鐘意突出個性嘅男士。",
+    "bestFor": [
+      "oval",
+      "long",
+      "square"
+    ],
+    "bestTexture": [
+      "wavy",
+      "curly"
+    ],
+    "maintenance": "medium",
+    "genPrompt": "a men's modern mullet haircut: short textured top and fringe, tapered sides, longer layered hair at the back of the neck, choppy edgy streetwear look",
+    "gender": "men"
+  },
+  {
+    "id": "buzz-fade",
+    "name": "漸變寸頭 Buzz Cut",
+    "tagline": "最慳時間,硬朗乾淨",
+    "description": "全頭推短配漸變,線條乾淨利落,完全唔使打理,夏天至啱,適合五官立體、頭型好嘅男士。",
+    "bestFor": [
+      "oval",
+      "square"
+    ],
+    "bestTexture": [
+      "straight",
+      "wavy",
+      "curly"
+    ],
+    "maintenance": "low",
+    "genPrompt": "a men's buzz cut with a low skin fade: very short even length on top (about 5 mm), sides fading down to skin, crisp clean hairline",
+    "gender": "men"
   }
 ];

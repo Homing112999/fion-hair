@@ -247,13 +247,34 @@ export function compositeHair(imageData, genImage, mask) {
   c.width = w; c.height = h;
   const ctx = c.getContext('2d');
   ctx.drawImage(genImage, 0, 0, w, h);
-  const gen = ctx.getImageData(0, 0, w, h);
+  const g = ctx.getImageData(0, 0, w, h).data;
   const out = new ImageData(new Uint8ClampedArray(imageData.data), w, h);
-  const o = out.data, g = gen.data, m = mask.data;
-  for (let i = 0; i < w * h; i++) {
+  const o = out.data, m = mask.data, n = w * h;
+  // AI 有時會加咗曲或者改咗髮絲 所以只攞佢嘅顏色同大範圍光暗 髮絲紋理用返原相
+  const ch = Array.from({ length: 6 }, () => new Float32Array(n));
+  const wt = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const j = i * 4;
+    const lo = rgbToLab(o[j], o[j + 1], o[j + 2]);
+    const lg = rgbToLab(g[j], g[j + 1], g[j + 2]);
+    const mw = m[i];
+    wt[i] = mw;
+    for (let k = 0; k < 3; k++) { ch[k][i] = lo[k] * mw; ch[k + 3][i] = lg[k] * mw; }
+  }
+  const r = Math.max(2, Math.round(Math.min(w, h) / 50));
+  const bw = boxBlur(wt, w, h, r);
+  const bs = ch.map((x) => boxBlur(x, w, h, r));
+  for (let i = 0; i < n; i++) {
     const a = smooth(0.08, 0.6, m[i]);
-    if (!a) continue;
-    for (let k = 0; k < 3; k++) o[i * 4 + k] = o[i * 4 + k] * (1 - a) + g[i * 4 + k] * a;
+    if (!a || bw[i] < 1e-3) continue;
+    const j = i * 4;
+    const lo = rgbToLab(o[j], o[j + 1], o[j + 2]);
+    const s = (k) => bs[k][i] / bw[i];
+    const L = Math.max(0, Math.min(100, lo[0] + (s(3) - s(0))));
+    const A = s(4) + 0.3 * (lo[1] - s(1));
+    const B = s(5) + 0.3 * (lo[2] - s(2));
+    const rgb = labToRgb(L, A, B);
+    for (let k = 0; k < 3; k++) o[j + k] = o[j + k] * (1 - a) + rgb[k] * a;
   }
   return out;
 }

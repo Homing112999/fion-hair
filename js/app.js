@@ -194,6 +194,35 @@ $('dye-save').onclick = () => {
 // ---------- AI 髮型速配 ----------
 const answers = { faceShape: null, texture: null, maintenance: null };
 
+// 女士 / 男士 髮型切換（02 03 熱門髮型三度共用）
+let gender = 'women';
+const styleGender = (x) => x.gender || 'women';
+const shownStyles = () => STYLES.filter((x) => styleGender(x) === gender);
+document.querySelectorAll('[data-gender-toggle]').forEach((box) => {
+  [['women', '女士髮型'], ['men', '男士髮型']].forEach(([g, label]) => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.dataset.g = g;
+    b.textContent = label;
+    b.onclick = () => setGender(g);
+    box.append(b);
+  });
+});
+function setGender(g) {
+  gender = g;
+  document.querySelectorAll('[data-gender-toggle]').forEach((box) => pressed(box, (b) => b.dataset.g === g));
+  document.querySelectorAll('#gen-styles .chip').forEach((b) => {
+    b.hidden = styleGender(STYLES.find((x) => x.id === b.dataset.id)) !== g;
+  });
+  if (gen.styleId && styleGender(STYLES.find((x) => x.id === gen.styleId)) !== g) {
+    gen.styleId = null;
+    pressed($('gen-styles'), () => false);
+    updateGen();
+  }
+  renderTrends();
+  if (answers.faceShape && answers.texture && answers.maintenance) showMatch();
+}
+
 function igLink() {
   return SHOP.instagram ? `https://www.instagram.com/${SHOP.instagram}/` : null;
 }
@@ -224,7 +253,7 @@ function choose(key, value) {
 
 // 配對方法同舊網站一樣：面型 3 分 髮質 2 分 打理習慣 2 分
 function match({ faceShape, texture, maintenance }) {
-  const scored = STYLES.map((d) => {
+  const scored = shownStyles().map((d) => {
     let f = 0;
     if (d.bestFor.includes(faceShape)) f += 3;
     if (d.bestTexture.includes(texture)) f += 2;
@@ -325,6 +354,8 @@ $('gen-reuse').onclick = () => state.photo && setGenPhoto(state.photo);
 
 // 由其他區跳過嚟：帶埋髮型同相
 function openPreview(styleId) {
+  const st = STYLES.find((x) => x.id === styleId);
+  if (st && styleGender(st) !== gender) setGender(styleGender(st));
   if (styleId) pickGenStyle(styleId);
   if (!gen.photo && state.photo) setGenPhoto(state.photo);
   $('preview').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -386,7 +417,8 @@ $('gen-go').onclick = async () => {
 };
 
 // ---------- 熱門髮型 ----------
-$('trend-cards').innerHTML = STYLES.map((x) => {
+function renderTrends() {
+$('trend-cards').innerHTML = shownStyles().map((x) => {
   const wa = waLink(`你好 Fion 我想約剪「${x.name}」`);
   return `<article class="card">
     <h3>${x.name}</h3>
@@ -398,10 +430,12 @@ $('trend-cards').innerHTML = STYLES.map((x) => {
     </div>
   </article>`;
 }).join('');
+}
 $('trend-cards').onclick = (e) => {
   const id = e.target.closest('[data-try]')?.dataset.try;
   if (id) openPreview(id);
 };
+setGender('women');
 
 // ---------- 預約 / 其他 ----------
 setBook($('book-main'), '你好 Fion 我想預約');
