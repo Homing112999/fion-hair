@@ -102,7 +102,7 @@ export async function onRequestPost({ request, env, fetchGemini = fetch }) {
 // 將 Google 嘅錯誤講返做人話 方便搵原因（後面個編號係 Google 回覆嘅狀態碼）
 function geminiError(status, detail) {
   if (/API key not valid|API_KEY_INVALID/i.test(detail)) return `生成失敗：Gemini key 唔啱 請喺 Cloudflare 重新貼過（${status}）`;
-  if (status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(detail)) return `生成失敗：Google 額度用完或者未開 billing（${status}）`;
+  if (status === 402 || status === 429 || /RESOURCE_EXHAUSTED|quota|billing|credit/i.test(detail)) return `AI 今日用量已滿 請遲啲再試 或者直接 WhatsApp Fion（Google 額度 ${status}）`;
   if (status === 403) return `生成失敗：Gemini key 冇權限 可能未開 billing 或者地區唔支援（${status}）`;
   if (status === 404) return `生成失敗：AI 型號搵唔到（${status}）`;
   if (status === 400 && /location|region|country/i.test(detail)) return `生成失敗：Google 喺呢個地區未開放（${status}）`;

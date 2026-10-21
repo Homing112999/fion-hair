@@ -152,7 +152,8 @@ function scheduleDyeAI() {
     return;
   }
   status($('dye-ai-status'), '⏳ 而家見到嘅係即時預覽 AI 正在幫你真實染緊 大約 10 至 30 秒…');
-  dyeTimer = setTimeout(() => runDyeAI(), 900);
+  // 停喺一隻色兩秒先叫 AI 揀色途中唔使錢
+  dyeTimer = setTimeout(() => runDyeAI(), 2000);
 }
 
 async function runDyeAI(force = false) {
@@ -408,9 +409,9 @@ $('gen-go').onclick = async () => {
       c.getContext('2d').drawImage(img, pad * kx, pad * ky, gen.photo.width * kx, gen.photo.height * ky, 0, 0, c.width, c.height);
       return c;
     };
-    // AI 有時會成張相重新構圖（郁咗個人） 對唔齊就自動再試 最多三次
+    // AI 有時會成張相重新構圖（郁咗個人） 對唔齊就自動再試一次（第二次貼返客人塊面） 慳返 AI 額度
     let url = null;
-    for (let attempt = 1; attempt <= 3 && !url; attempt++) {
+    for (let attempt = 1; attempt <= 2 && !url; attempt++) {
       if (attempt > 1) status(st, `⏳ AI 張圖郁咗你個樣 自動再畫一次（第 ${attempt} 次）…`);
       const res = await fetch('api/preview', {
         method: 'POST',
@@ -442,7 +443,7 @@ $('gen-go').onclick = async () => {
           url = c.toDataURL('image/jpeg', 0.92);
         }
       } catch (e) { console.error(e); }
-      if (!url && attempt === 3) {
+      if (!url && attempt === 2) {
         const img = new Image();
         img.src = data.image;
         await img.decode();
