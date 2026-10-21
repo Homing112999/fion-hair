@@ -156,6 +156,25 @@ function scheduleDyeAI() {
   dyeTimer = setTimeout(() => runDyeAI(), 2000);
 }
 
+// 頭髮平均色：AI 結果同原相差唔多 但目標色又同原相差好遠 = AI 冇染到
+function unchanged(before, after, mask, hex) {
+  const mean = (img) => {
+    const m = [0, 0, 0];
+    let n = 0;
+    for (let i = 0; i < mask.data.length; i++) {
+      if (mask.data[i] < 0.6) continue;
+      for (let k = 0; k < 3; k++) m[k] += img.data[i * 4 + k];
+      n++;
+    }
+    return n ? m.map((v) => v / n) : null;
+  };
+  const a = mean(before), b = mean(after);
+  if (!a || !b) return false;
+  const t = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const d = (x, y) => Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+  return d(a, b) < 10 && d(a, t) > 35;
+}
+
 async function runDyeAI(force = false) {
   if (!state.photo || !state.mask) return;
   const key = dyeKey();
@@ -185,6 +204,11 @@ async function runDyeAI(force = false) {
     const c = document.createElement('canvas');
     c.width = state.original.width; c.height = state.original.height;
     c.getContext('2d').putImageData(compositeHair(state.original, img, state.mask), 0, 0);
+    // AI 有時會原封不動交返張相 嗰陣唔好扮染咗
+    if (unchanged(state.original, c.getContext('2d').getImageData(0, 0, c.width, c.height), state.mask, colour.hex)) {
+      status(st, 'AI 今次冇染到 而家顯示嘅係即時預覽 可以撳下面「AI 再畫一次」。');
+      return;
+    }
     const url = c.toDataURL('image/jpeg', 0.92);
     dyeCache.set(key, url);
     if (token !== dyeToken || dyeKey() !== key) return;

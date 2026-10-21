@@ -32,7 +32,7 @@ export function buildDyePrompt(colour, base) {
   const dark = colour.lift > (Number(base) || 3);
   return [
     'Edit this photo. Recolour ONLY the hair of every person in the photo, as if a professional colourist in a Hong Kong salon just dyed it',
-    `to "${colour.id.replace(/-/g, ' ')}": ${colour.en || colour.note}. Target shade close to ${colour.hex}; keep the hue true to this description and do not oversaturate.`,
+    `to "${colour.id.replace(/-/g, ' ')}": ${colour.en || colour.note}. Target shade close to ${colour.hex}; keep the hue true to this description and do not oversaturate. If the hair is already close to this shade, still visibly shift it to exactly this target tone (adjust warmth, ash and depth).`,
     dark
       ? 'The natural hair is dark and was not bleached, so the new colour should read subtly: richer and tinted in the light, deeper in the shadows, like real dye on dark Asian hair.'
       : 'Make the colour clearly visible but natural.',
