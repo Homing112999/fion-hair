@@ -10,18 +10,19 @@ export const SHOP = {
 };
 
 // 大熱髮色：hex 只係網站預覽用嘅參考色，唔係染膏配方
+// en = 畀 AI 睇嘅英文色描述（要準 唔好畀佢染到太橙）
 // lift = 由幾多度底色開始先做到（3 = 原生黑髮都得，6 / 9 = 要褪色或漂）
 export const COLOURS = [
-  { id: 'mint-beige', name: '薄荷米棕', hex: '#8C7B66', lift: 6, note: '帶少少青嘅米棕 壓黃顯白' },
-  { id: 'milk-tea', name: '奶茶色', hex: '#A9876A', lift: 6, note: '淺暖啡 好溫柔' },
-  { id: 'black-tea', name: '黑茶色', hex: '#3B2A22', lift: 3, note: '深啡近黑 返工都得' },
-  { id: 'ash-brown', name: '霧感灰棕', hex: '#6E625A', lift: 6, note: '而家最流行嘅霧感色 冇黃氣' },
-  { id: 'eggplant', name: '茄子紫灰', hex: '#4E3F4C', lift: 3, note: '深紫帶灰 低調有型' },
-  { id: 'grape', name: '葡萄紫灰', hex: '#6A5470', lift: 6, note: '淺啲嘅紫灰 光底下見紫' },
-  { id: 'cinnamon', name: '肉桂橙', hex: '#A0603A', lift: 6, note: '暖橙啡 好顯氣色' },
-  { id: 'caramel', name: '焦糖棕', hex: '#9A5B2E', lift: 6, note: '暖金啡 有光澤感' },
-  { id: 'linen', name: '亞麻色', hex: '#B8A27E', lift: 9, note: '淺亞麻 要漂' },
-  { id: 'blue-black', name: '藍黑色', hex: '#1C2230', lift: 3, note: '黑底透藍光' },
+  { id: 'mint-beige', name: '薄荷米棕', hex: '#8C7B66', lift: 6, note: '帶少少青嘅米棕 壓黃顯白', en: 'a cool, muted beige-brown with a subtle greenish-ash tint that cancels brassiness; still reads as brown, not grey and not green' },
+  { id: 'milk-tea', name: '奶茶色', hex: '#A9876A', lift: 6, note: '淺暖啡 好溫柔', en: 'a soft, light, warm beige-brown like milk tea' },
+  { id: 'black-tea', name: '黑茶色', hex: '#3B2A22', lift: 3, note: '深啡近黑 返工都得', en: 'a very dark brown, almost black, with a slight warm brown sheen in the light' },
+  { id: 'ash-brown', name: '霧感灰棕', hex: '#6E625A', lift: 6, note: '而家最流行嘅霧感色 冇黃氣', en: 'a cool, muted, smoky ash brown with no yellow or orange' },
+  { id: 'eggplant', name: '茄子紫灰', hex: '#4E3F4C', lift: 3, note: '深紫帶灰 低調有型', en: 'a dark, muted purple mixed with grey; the purple shows mainly where light hits' },
+  { id: 'grape', name: '葡萄紫灰', hex: '#6A5470', lift: 6, note: '淺啲嘅紫灰 光底下見紫', en: 'a medium, muted lavender-purple grey' },
+  { id: 'cinnamon', name: '肉桂橙', hex: '#A0603A', lift: 6, note: '暖橙啡 好顯氣色', en: 'a warm orange-brown like cinnamon' },
+  { id: 'caramel', name: '焦糖棕', hex: '#8A5A36', lift: 6, note: '暖金啡 有光澤感', en: 'a soft medium golden brown like caramel sauce, warm but muted; clearly brown, NOT orange, NOT copper, NOT ginger' },
+  { id: 'linen', name: '亞麻色', hex: '#B8A27E', lift: 9, note: '淺亞麻 要漂', en: 'a light ash-beige blonde like natural linen' },
+  { id: 'blue-black', name: '藍黑色', hex: '#1C2230', lift: 3, note: '黑底透藍光', en: 'black hair with a subtle blue sheen in the highlights' },
 ];
 
 export const BASES = [

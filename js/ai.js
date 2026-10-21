@@ -25,7 +25,7 @@ function segmenter() {
   return segmenterPromise;
 }
 
-function landmarker() {
+export function landmarker() {
   landmarkerPromise ??= create(FaceLandmarker, {
     baseOptions: { modelAssetPath: BASE + 'models/face_landmarker.task' },
     runningMode: 'IMAGE',
@@ -350,23 +350,23 @@ function warpTris(img, src, dst, ctx) {
 }
 
 // 瀏海垂落塊面嘅幼髮絲：比附近皮膚暗嘅細線 （避開眼 鼻孔 嘴唇呢啲本身暗嘅位）
-function strandMask(canvas, pa, w, h) {
+export function strandMask(canvas, pa, w, h) {
   const d = canvas.getContext('2d').getImageData(0, 0, w, h).data;
   const L = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) L[i] = rgbToLab(d[i * 4], d[i * 4 + 1], d[i * 4 + 2])[0];
   const faceW = dist(pa[234], pa[454], w, h);
   const local = boxBlur(L, w, h, Math.max(3, Math.round(faceW / 40)));
   const face = faceCoreMask(pa, w, h, FACE_CORE, 0.95);
-  const skip = [faceCoreMask(pa, w, h, LIPS, 1.25), ...EYES.map((e) => faceCoreMask(pa, w, h, e, 1.5))];
+  const skip = [faceCoreMask(pa, w, h, LIPS, 1.25), ...EYES.map((e) => faceCoreMask(pa, w, h, e, 1.1))];
   const nose = [98, 327, 2].map((k) => [pa[k].x * w, pa[k].y * h]);
-  const rn = faceW * 0.09;
+  const rn = faceW * 0.045;
   const out = new Float32Array(w * h);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
       if (face[i] < 0.5 || skip.some((q) => q[i] > 0.05)) continue;
       if (nose.some(([nx, ny]) => Math.hypot(x - nx, y - ny) < rn)) continue;
-      out[i] = smooth(4, 9, local[i] - L[i]);
+      out[i] = smooth(3, 8, local[i] - L[i]);
     }
   }
   // 放闊少少 連髮絲邊都蓋埋
@@ -409,11 +409,28 @@ async function swapFace(origCanvas, raw, pa, pr, w, h) {
   // 鼻 口 面頰 下巴一定用客人自己；眼睛冇瀏海遮先貼 有遮就用 AI 畫嘅眼
   const lower = faceCoreMask(pr, w, h, LOWER_FACE, 0.92);
   const parts = [lower];
+  let fringe = false;
   for (const eye of EYES) {
     const em = faceCoreMask(pr, w, h, eye, 1.6);
     let s1 = 0, s0 = 0;
     for (let i = 0; i < w * h; i++) if (em[i] > 0.5) { s1 += hair[i]; s0++; }
     if (s0 && s1 / s0 < 0.04) parts.push(em);
+    else fringe = true;
+  }
+  // 瀏海遮住眼：髮絲通常會垂落眼下同鼻側 淨係貼鼻底以下（口 下巴） 其餘用 AI 圖
+  if (fringe) {
+    const [ex, ey] = [P(pr, 263)[0] - P(pr, 33)[0], P(pr, 263)[1] - P(pr, 33)[1]];
+    const el = Math.hypot(ex, ey) || 1;
+    const [nx, ny] = [-ey / el, ex / el];
+    const [sx, sy] = P(pr, 2);
+    const feather = el * 0.12;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const d = (x - sx) * nx + (y - sy) * ny;
+        lower[y * w + x] *= smooth(0, feather, d);
+      }
+    }
+    parts.length = 1;
   }
   const m = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) {

@@ -31,13 +31,13 @@ export function buildPrompt(style, colour) {
 export function buildDyePrompt(colour, base) {
   const dark = colour.lift > (Number(base) || 3);
   return [
-    'Edit this photo. Recolour ONLY the hair of the person, as if a professional colourist in a Hong Kong salon just dyed it',
-    `to "${colour.id.replace(/-/g, ' ')}" (${colour.note}), target shade close to ${colour.hex}.`,
+    'Edit this photo. Recolour ONLY the hair of every person in the photo, as if a professional colourist in a Hong Kong salon just dyed it',
+    `to "${colour.id.replace(/-/g, ' ')}": ${colour.en || colour.note}. Target shade close to ${colour.hex}; keep the hue true to this description and do not oversaturate.`,
     dark
       ? 'The natural hair is dark and was not bleached, so the new colour should read subtly: richer and tinted in the light, deeper in the shadows, like real dye on dark Asian hair.'
       : 'Make the colour clearly visible but natural.',
     'This is a colour-only edit: only recolour the existing hair pixels. Do NOT change the haircut, length, parting, curl, waves or volume. Keep natural strand-level variation, shine, highlights and shadows, slightly deeper tone near the roots, and soft edges where hair meets skin and background.',
-    'Do NOT alter anything else: same face shape, identity, skin, eyebrows, makeup, accessories (add none, remove none), clothing, other people, background, lighting, framing and camera angle. No beautifying, no slimming. Output the same image size and composition. Photorealistic. No text, no watermark.',
+    'Do NOT alter anything else: same face shape, identity, skin, eyebrows, makeup, accessories (add none, remove none), clothing, background, lighting, framing and camera angle. No beautifying, no slimming. Output the same image size and composition. Photorealistic. No text, no watermark.',
   ].join(' ');
 }
 
