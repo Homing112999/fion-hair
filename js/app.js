@@ -433,7 +433,7 @@ $('gen-go').onclick = async () => {
       c.getContext('2d').drawImage(img, pad * kx, pad * ky, gen.photo.width * kx, gen.photo.height * ky, 0, 0, c.width, c.height);
       return c;
     };
-    // AI 有時會成張相重新構圖（郁咗個人） 對唔齊就自動再試一次（第二次貼返客人塊面） 慳返 AI 額度
+    // AI 張圖搵唔到塊面先再試一次 慳返 AI 額度
     let url = null;
     for (let attempt = 1; attempt <= 2 && !url; attempt++) {
       if (attempt > 1) status(st, `⏳ AI 張圖郁咗你個樣 自動再畫一次（第 ${attempt} 次）…`);
@@ -458,8 +458,8 @@ $('gen-go').onclick = async () => {
         img.src = data.image;
         await img.decode();
         const cropped = unpad(img);
-        // 第一次要求 AI 張圖本身對得齊；之後 AI 打側咗個頭都逐點拉返去客人塊面度
-        const mixed = await compositeRestyle(gen.photo, cropped, { warp: attempt > 1 });
+        // 對得齊就淨係換頭髮；AI 打側咗個頭或者調過光 就用 AI 圖做底貼返客人塊面
+        const mixed = await compositeRestyle(gen.photo, cropped, { warp: true });
         if (mixed) {
           const c = document.createElement('canvas');
           c.width = mixed.width; c.height = mixed.height;

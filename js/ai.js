@@ -349,6 +349,49 @@ function warpTris(img, src, dst, ctx) {
   }
 }
 
+// 校正後 AI 圖實際蓋到嘅範圍（0 至 1） 邊位收窄少少
+function coverMask(w, h, transform) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  transform(ctx);
+  ctx.fillRect(0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const m = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) m[i] = d[i * 4 + 3] / 255;
+  const b = boxBlur(m, w, h, Math.max(2, Math.round(Math.min(w, h) / 100)));
+  for (let i = 0; i < w * h; i++) b[i] = smooth(0.9, 1, b[i]);
+  return b;
+}
+
+// 頭髮遮罩只留低同主角塊面連住嗰嚿（其他人嘅頭髮清走）
+function mainPerson(m, pa, w, h) {
+  const faceW = dist(pa[234], pa[454], w, h);
+  let cx = 0, cy = 0;
+  for (const k of OVAL) { cx += pa[k].x * w; cy += pa[k].y * h; }
+  cx /= OVAL.length; cy /= OVAL.length;
+  const seen = new Uint8Array(w * h);
+  const stack = [];
+  const r = faceW * 0.85;
+  for (let y = Math.max(0, Math.floor(cy - r)); y < Math.min(h, cy + r); y++) {
+    for (let x = Math.max(0, Math.floor(cx - r)); x < Math.min(w, cx + r); x++) {
+      const i = y * w + x;
+      if (m[i] > 0.25 && Math.hypot(x - cx, y - cy) < r) { seen[i] = 1; stack.push(i); }
+    }
+  }
+  while (stack.length) {
+    const i = stack.pop();
+    const x = i % w, y = (i - x) / w;
+    for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1]) {
+      if (j >= 0 && !seen[j] && m[j] > 0.25) { seen[j] = 1; stack.push(j); }
+    }
+  }
+  const keep = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) keep[i] = seen[i];
+  const soft = boxBlur(keep, w, h, Math.max(2, Math.round(Math.min(w, h) / 120)));
+  for (let i = 0; i < w * h; i++) m[i] *= smooth(0, 0.3, soft[i]);
+}
+
 // 瀏海垂落塊面嘅幼髮絲：比附近皮膚暗嘅細線 （避開眼 鼻孔 嘴唇呢啲本身暗嘅位）
 export function strandMask(canvas, pa, w, h) {
   const d = canvas.getContext('2d').getImageData(0, 0, w, h).data;
@@ -503,7 +546,7 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
   gc.width = w; gc.height = h;
   const gctx = gc.getContext('2d');
   gctx.drawImage(origCanvas, 0, 0);
-  let aligned = false;
+  let aligned = false, cover = null;
   if (sc >= 0.75 && sc <= 1.35 && Math.abs(ang) <= 0.25) {
     gctx.translate(a1[0], a1[1]);
     gctx.rotate(ang);
@@ -511,6 +554,13 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
     gctx.translate(-b1[0], -b1[1]);
     gctx.drawImage(raw, 0, 0);
     gctx.setTransform(1, 0, 0, 1, 0, 0);
+    // AI 圖轉咗角度之後 四邊會露返原相 嗰啲位唔可以用
+    cover = coverMask(w, h, (ctx) => {
+      ctx.translate(a1[0], a1[1]);
+      ctx.rotate(ang);
+      ctx.scale(sc, sc);
+      ctx.translate(-b1[0], -b1[1]);
+    });
     // 校正之後 鼻尖同下巴都要對得返 （打側太多就對唔到）
     const pb = lm.detect(gc).faceLandmarks?.[0];
     const faceW = dist(pa[234], pa[454], w, h);
@@ -521,6 +571,11 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
     return swapFace(origCanvas, raw, pa, pr, w, h);
   }
   const [ma, mb] = [await hairMask(origCanvas), await hairMask(gc)];
+  // 淨係處理主角嘅頭髮（相入面其他人唔郁） 加埋垂落塊面嘅幼髮絲
+  mainPerson(ma.data, pa, w, h);
+  mainPerson(mb.data, pa, w, h);
+  const strands = strandMask(origCanvas, pa, w, h);
+  for (let i = 0; i < w * h; i++) ma.data[i] = Math.max(ma.data[i], strands[i]);
   const union = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) union[i] = Math.max(ma.data[i], mb.data[i]);
   const gr = Math.max(3, Math.round(Math.min(w, h) / 60));
@@ -537,7 +592,7 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
   const wt = new Float32Array(w * h);
   const dch = [0, 1, 2].map(() => new Float32Array(w * h));
   for (let i = 0; i < w * h; i++) {
-    alpha[i] = Math.max(smooth(0.03, 0.5, grown[i]), smooth(0.02, 0.25, oldHair[i]));
+    alpha[i] = Math.max(smooth(0.03, 0.5, grown[i]), smooth(0.02, 0.25, oldHair[i])) * cover[i];
     const j = i * 4;
     if (alpha[i] === 0 && i % 7 === 0) {
       diff += Math.abs(o.data[j] - g.data[j]) + Math.abs(o.data[j + 1] - g.data[j + 1]) + Math.abs(o.data[j + 2] - g.data[j + 2]);
@@ -548,7 +603,8 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
       for (let k = 0; k < 3; k++) dch[k][i] = (o.data[j + k] - g.data[j + k]) * wt[i];
     }
   }
-  if (!cnt || diff / cnt / 3 > 20) return null;
+  // AI 有時會成張相調過光 色差大過 30 就唔信呢個對位 改用 AI 圖做底貼返塊面
+  if (!cnt || diff / cnt / 3 > 30) return warp ? swapFace(origCanvas, raw, pa, pr, w, h) : null;
   const R = Math.max(4, Math.round(Math.min(w, h) / 10));
   const blur2 = (a) => boxBlur(boxBlur(a, w, h, R), w, h, R);
   const wb = blur2(wt);
