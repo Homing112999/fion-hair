@@ -349,13 +349,32 @@ function warpTris(img, src, dst, ctx) {
   }
 }
 
+// AI 圖四邊延伸（複製邊位像素）：轉角度放大之後都蓋得滿成張相 唔會露出一條直線
+const EXT = 0.08;
+function extendEdges(img) {
+  const w = img.width, h = img.height, m = Math.round(EXT * Math.max(w, h));
+  const c = document.createElement('canvas');
+  c.width = w + 2 * m; c.height = h + 2 * m;
+  const x = c.getContext('2d');
+  x.drawImage(img, 0, 0, w, 1, m, 0, w, m);
+  x.drawImage(img, 0, h - 1, w, 1, m, h + m, w, m);
+  x.drawImage(img, 0, 0, 1, h, 0, m, m, h);
+  x.drawImage(img, w - 1, 0, 1, h, w + m, m, m, h);
+  x.drawImage(img, 0, 0, 1, 1, 0, 0, m, m);
+  x.drawImage(img, w - 1, 0, 1, 1, w + m, 0, m, m);
+  x.drawImage(img, 0, h - 1, 1, 1, 0, h + m, m, m);
+  x.drawImage(img, w - 1, h - 1, 1, 1, w + m, h + m, m, m);
+  x.drawImage(img, m, m);
+  return c;
+}
+
 // 校正後 AI 圖實際蓋到嘅範圍（0 至 1） 邊位收窄少少
-function coverMask(w, h, transform) {
+function coverMask(w, h, transform, margin = 0) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const ctx = c.getContext('2d');
   transform(ctx);
-  ctx.fillRect(0, 0, w, h);
+  ctx.fillRect(-margin, -margin, w + 2 * margin, h + 2 * margin);
   const d = ctx.getImageData(0, 0, w, h).data;
   const m = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) m[i] = d[i * 4 + 3] / 255;
@@ -552,7 +571,7 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
     gctx.rotate(ang);
     gctx.scale(sc, sc);
     gctx.translate(-b1[0], -b1[1]);
-    gctx.drawImage(raw, 0, 0);
+    gctx.drawImage(extendEdges(raw), -Math.round(EXT * Math.max(w, h)), -Math.round(EXT * Math.max(w, h)));
     gctx.setTransform(1, 0, 0, 1, 0, 0);
     // AI 圖轉咗角度之後 四邊會露返原相 嗰啲位唔可以用
     cover = coverMask(w, h, (ctx) => {
@@ -560,7 +579,7 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
       ctx.rotate(ang);
       ctx.scale(sc, sc);
       ctx.translate(-b1[0], -b1[1]);
-    });
+    }, Math.round(EXT * Math.max(w, h)));
     // 校正之後 鼻尖同下巴都要對得返 （打側太多就對唔到）
     const pb = lm.detect(gc).faceLandmarks?.[0];
     const faceW = dist(pa[234], pa[454], w, h);
@@ -603,8 +622,8 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
       for (let k = 0; k < 3; k++) dch[k][i] = (o.data[j + k] - g.data[j + k]) * wt[i];
     }
   }
-  // AI 有時會成張相調過光 色差大過 30 就唔信呢個對位 改用 AI 圖做底貼返塊面
-  if (!cnt || diff / cnt / 3 > 30) return warp ? swapFace(origCanvas, raw, pa, pr, w, h) : null;
+  // AI 有時會成張相調過光 色差大過 20 就唔信呢個對位 改用 AI 圖做底貼返塊面
+  if (!cnt || diff / cnt / 3 > 20) return warp ? swapFace(origCanvas, raw, pa, pr, w, h) : null;
   const R = Math.max(4, Math.round(Math.min(w, h) / 10));
   const blur2 = (a) => boxBlur(boxBlur(a, w, h, R), w, h, R);
   const wb = blur2(wt);
