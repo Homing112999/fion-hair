@@ -459,7 +459,7 @@ $('gen-go').onclick = async () => {
         await img.decode();
         const cropped = unpad(img);
         // 對得齊就淨係換頭髮；AI 打側咗個頭或者調過光 就用 AI 圖做底貼返客人塊面
-        const mixed = await compositeRestyle(gen.photo, cropped, { warp: true, maxYaw: attempt === 1 ? 0.45 : Infinity });
+        const mixed = await compositeRestyle(gen.photo, cropped, { warp: true, maxYaw: attempt === 1 ? 1.1 : Infinity });
         if (mixed) {
           const c = document.createElement('canvas');
           c.width = mixed.width; c.height = mixed.height;
