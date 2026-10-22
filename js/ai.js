@@ -609,13 +609,23 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
   const blur2 = (a) => boxBlur(boxBlur(a, w, h, R), w, h, R);
   const wb = blur2(wt);
   const off = dch.map(blur2);
+  // 遠離量度點嘅位用全相平均色差 （唔係直接變 0 否則會見到一格格嘅方塊）
+  let wsum = 0, wmax = 0;
+  const gsum = [0, 0, 0];
+  for (let i = 0; i < w * h; i++) {
+    wsum += wt[i];
+    wmax = Math.max(wmax, wb[i]);
+    for (let k = 0; k < 3; k++) gsum[k] += dch[k][i];
+  }
+  const gOff = gsum.map((v) => (wsum ? v / wsum : 0));
+  const eps = Math.max(1e-6, wmax * 0.05);
   for (let i = 0; i < w * h; i++) {
     const a = alpha[i];
     if (!a) continue;
     // 新頭髮保持 AI 原色 其餘（皮膚 背景）校正色差
     const fix = 1 - smooth(0.2, 0.7, mb.data[i]);
     for (let k = 0; k < 3; k++) {
-      const d = wb[i] > 1e-4 ? Math.max(-60, Math.min(60, off[k][i] / wb[i])) : 0;
+      const d = Math.max(-60, Math.min(60, (off[k][i] + gOff[k] * eps) / (wb[i] + eps)));
       const gv = g.data[i * 4 + k] + d * fix;
       o.data[i * 4 + k] = o.data[i * 4 + k] * (1 - a) + gv * a;
     }
