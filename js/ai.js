@@ -349,6 +349,11 @@ function warpTris(img, src, dst, ctx) {
   }
 }
 
+// 個頭轉咗幾多（鼻尖去左右面邊嘅距離比例 取 log） 0 = 正面
+function yaw(q, w, h) {
+  return Math.log(dist(q[1], q[234], w, h) / dist(q[1], q[454], w, h));
+}
+
 // AI 圖四邊延伸（複製邊位像素）：轉角度放大之後都蓋得滿成張相 唔會露出一條直線
 const EXT = 0.08;
 function extendEdges(img) {
@@ -556,7 +561,7 @@ function faceCoreMask(pa, w, h, poly = FACE_CORE, scale = 0.9) {
 
 // AI 效果圖：新舊頭髮範圍（再放大少少）用 AI 圖 其他（塊面 眼鏡 衫 背景）用返原相
 // 先試簡單對位（放大 縮細 轉角度）； warp = true 時 AI 打側咗個頭就用 AI 圖做底 貼返客人塊面
-export async function compositeRestyle(origCanvas, genImage, { warp = false } = {}) {
+export async function compositeRestyle(origCanvas, genImage, { warp = false, maxYaw = Infinity } = {}) {
   const w = origCanvas.width, h = origCanvas.height;
   const raw = document.createElement('canvas');
   raw.width = w; raw.height = h;
@@ -596,6 +601,8 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
   }
   if (!aligned) {
     if (!warp || sc < 0.5 || sc > 2 || Math.abs(ang) > 0.6) return null;
+    // AI 將個頭轉得太側 貼返正面嘅塊面會變雙重口 叫 AI 再畫過
+    if (Math.abs(yaw(pr, w, h) - yaw(pa, w, h)) > maxYaw) return null;
     return swapFace(origCanvas, raw, pa, pr, w, h);
   }
   const [ma, mb] = [await hairMask(origCanvas), await hairMask(gc)];
@@ -631,7 +638,7 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
     }
   }
   // AI 有時會成張相調過光 色差大過 20 就唔信呢個對位 改用 AI 圖做底貼返塊面
-  if (!cnt || diff / cnt / 3 > 20) return warp ? swapFace(origCanvas, raw, pa, pr, w, h) : null;
+  if (!cnt || diff / cnt / 3 > 20) return warp && Math.abs(yaw(pr, w, h) - yaw(pa, w, h)) <= maxYaw ? swapFace(origCanvas, raw, pa, pr, w, h) : null;
   const R = Math.max(4, Math.round(Math.min(w, h) / 10));
   const blur2 = (a) => boxBlur(boxBlur(a, w, h, R), w, h, R);
   const wb = blur2(wt);
