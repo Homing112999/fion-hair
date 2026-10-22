@@ -411,6 +411,16 @@ function mainPerson(m, pa, w, h) {
   for (let i = 0; i < w * h; i++) m[i] *= smooth(0, 0.3, soft[i]);
 }
 
+// 原相有頭髮遮住塊面（瀏海 側髮）先搵幼髮絲 否則會將暗粒 胎記當咗頭髮
+function addStrands(m, canvas, pa, w, h) {
+  const core = faceCoreMask(pa, w, h);
+  let s1 = 0, s0 = 0;
+  for (let i = 0; i < w * h; i++) if (core[i] > 0.5) { s1 += m[i] > 0.3 ? 1 : 0; s0++; }
+  if (!s0 || s1 / s0 < 0.02) return;
+  const strands = strandMask(canvas, pa, w, h);
+  for (let i = 0; i < w * h; i++) m[i] = Math.max(m[i], strands[i]);
+}
+
 // 瀏海垂落塊面嘅幼髮絲：比附近皮膚暗嘅細線 （避開眼 鼻孔 嘴唇呢啲本身暗嘅位）
 export function strandMask(canvas, pa, w, h) {
   const d = canvas.getContext('2d').getImageData(0, 0, w, h).data;
@@ -449,8 +459,7 @@ async function swapFace(origCanvas, raw, pa, pr, w, h) {
   warpTris(origCanvas, keys.map((k) => P(pa, k)), keys.map((k) => P(pr, k)), fctx);
   // 原相嘅頭髮遮罩都拉去 AI 塊面位置 （幼髮絲 分割模型未必捉到 所以再放闊）
   const ma = await hairMask(origCanvas);
-  const strands = strandMask(origCanvas, pa, w, h);
-  for (let i = 0; i < w * h; i++) ma.data[i] = Math.max(ma.data[i], strands[i]);
+  addStrands(ma.data, origCanvas, pa, w, h);
   const mc = document.createElement('canvas');
   mc.width = w; mc.height = h;
   const mctx = mc.getContext('2d');
@@ -593,8 +602,7 @@ export async function compositeRestyle(origCanvas, genImage, { warp = false } = 
   // 淨係處理主角嘅頭髮（相入面其他人唔郁） 加埋垂落塊面嘅幼髮絲
   mainPerson(ma.data, pa, w, h);
   mainPerson(mb.data, pa, w, h);
-  const strands = strandMask(origCanvas, pa, w, h);
-  for (let i = 0; i < w * h; i++) ma.data[i] = Math.max(ma.data[i], strands[i]);
+  addStrands(ma.data, origCanvas, pa, w, h);
   const union = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) union[i] = Math.max(ma.data[i], mb.data[i]);
   const gr = Math.max(3, Math.round(Math.min(w, h) / 60));
